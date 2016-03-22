@@ -25,13 +25,13 @@ main = do putStrLn "Testing parser..."
           go1 litChar "charlit.uasm" 
           go1 charExpr "charlit.uasm"
 
-          -- go1 expr "hexnum.uasm"
-          -- go1 expr "binnum.uasm"
-          -- go1 expr "decnum.uasm"
-          -- go1 expr "charlit.uasm"
+          go1 expr "hexnum.uasm"
+          go1 expr "binnum.uasm"
+          go1 expr "decnum.uasm"
+          go1 expr "charlit.uasm"
 
-          -- go1 binExpr "binexp.uasm"
-          -- go1 expr "binexp.uasm"
+          go1 binExpr "binexp.uasm"
+          go1 expr "binexp.uasm"
           
 go1 x y = processResults $ setupTest x y
 goN x y = setupTests x y

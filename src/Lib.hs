@@ -141,7 +141,7 @@ binNum = do string "0b"
 decNum :: Parser Integer        
 decNum = do d <- many1 digit
             return (read d :: Integer)
-
+            
 ------------------------------------------------------------------            
 data LitChar = LitChar Char deriving (Show, Eq)
 
@@ -181,15 +181,41 @@ identExpr :: Parser Expr
 identExpr = do c <- try ident
                return $ IdentExpr c
 
-term = try numExpr <|> try identExpr <|> try charExpr
+term1 = try numExpr <|> try identExpr <|> try charExpr
+term2 = do char '('
+           t <- term
+           char ')'
+           return t
+term = try term2 <|> try term1
+           
+binExpr1 = do t <- term
+              restExpr t <|> emptyExpr t
+              
+binExpr2 = do char '('
+              t <- term
+              result <- restExpr t <|> emptyExpr t
+              char ')'
+              return result
+              
 
-binExpr = do t <- term
-             restExpr t <|> emptyExpr t
-             
-restExpr t = do b <- binop
-                s <- binExpr <|> term
-                return $ BinExpr b t s
+binExpr = try binExpr2 <|> try binExpr1
+
+restExpr1 t = do b <- binop
+                 s <- binExpr <|> term
+                 return $ BinExpr b t s
+restExpr2 t = par (restExpr1 t)
+restExpr t = (try $ restExpr1 t) <|> (try $ restExpr2 t)
+
 
 emptyExpr t = return t                
 
-expr = binExpr 
+par x = do char '('
+           y <- x
+           char ')'
+           return y
+           
+expr = try (par binExpr) <|> try binExpr
+------------------------------------------------------------------
+data Macro = MacroLine Ident ArgList [Expr]
+
+  
