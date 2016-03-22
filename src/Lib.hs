@@ -6,15 +6,12 @@ module Lib where
 
 import Text.Parsec
 import Text.Parsec.Char
---import Text.Parsec.Expr
 import Text.Parsec.String
 import Text.ParserCombinators.Parsec.Token
 import Text.ParserCombinators.Parsec.Expr
 import Text.ParserCombinators.Parsec.Language
 import qualified Text.ParserCombinators.Parsec.Token as Token
 import Data.Functor.Identity
-someFunc :: IO ()
-someFunc = putStrLn "someFunc"
   
 lineComment :: Parser String
 lineComment = do spaces
@@ -211,7 +208,11 @@ languageDef =
            , Token.identStart      = letter
            , Token.identLetter     = alphaNum
            , Token.reservedNames   = []
-           , Token.reservedOpNames = ["+", "-", "*", "/"]
+           , Token.reservedOpNames = [ "+", "-", "*", "/"
+                                     , "~", "&", "|", "+"
+                                     , "-", "*", "/", "%"
+                                     , ">>", "<<" 
+                                     ]
            }
 
 lexer :: GenTokenParser String u Data.Functor.Identity.Identity
@@ -219,24 +220,30 @@ lexer = Token.makeTokenParser languageDef
 
 resOp = Token.reservedOp lexer
 
-expr :: Parser Expr
-expr = buildExpressionParser ops term
-opNeg :: Parser (Expr -> Expr)
-opNeg = do string "-"
-           return Neg
-
 ops = [ [ Prefix (resOp "-" >> return (Neg))]
       , [ Infix (resOp "*" >> return (BinExpr Multiplication)) AssocLeft
         , Infix (resOp "/" >> return (BinExpr Division )) AssocLeft
         , Infix (resOp "+" >> return (BinExpr Addition )) AssocLeft
         , Infix (resOp "-" >> return (BinExpr Subtraction )) AssocLeft
+        , Infix (resOp "~" >> return (BinExpr BitwiseComplement)) AssocLeft
+        , Infix (resOp "&" >> return (BinExpr BitWiseAnd)) AssocLeft
+        , Infix (resOp "|" >> return (BinExpr BitWiseOr)) AssocLeft
+        , Infix (resOp "+" >> return (BinExpr Addition)) AssocLeft
+        , Infix (resOp "-" >> return (BinExpr Subtraction)) AssocLeft
+        , Infix (resOp "*" >> return (BinExpr Multiplication)) AssocLeft
+        , Infix (resOp "/" >> return (BinExpr Division)) AssocLeft
+        , Infix (resOp "%" >> return (BinExpr Modulo)) AssocLeft
+        , Infix (resOp ">>" >> return (BinExpr RightShift)) AssocLeft
+        , Infix (resOp "<<" >> return (BinExpr LeftShift)) AssocLeft
         ]]
 
-term = parens lexer expr <|> numExpr <|> identExpr <|> charExpr
+term1 = parens lexer expr <|> numExpr <|> identExpr <|> charExpr
+term2 = do spaces
+           t <- term1
+           spaces
+           return t
 
--- parseString :: String -> Expr
--- parseString str =
---    case parse expr "" str of
---      Left e  -> error $ show e
---      Right r -> r
-
+expr :: Parser Expr
+expr = buildExpressionParser ops term2
+           
+------------------------------------------------------------------

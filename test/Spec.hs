@@ -32,6 +32,8 @@ main = do putStrLn "Testing parser..."
           go1 expr "charlit.uasm"
 
           go1 expr "binexp.uasm"
+          go1 expr "parenbinexp.uasm"
+          
           
 go1 x y = processResults $ setupTest x y
 goN x y = setupTests x y
@@ -43,9 +45,9 @@ processResults (file, result) = do
     Right msg -> putStrLn $ "Pass: " ++ file ++ ": " ++ (show msg)
   
 setupTest parser file =
-  (file, parseFromFile parser ("./test/" ++ file))
+  (file, parseFromFile parser ("./test/uasm/" ++ file))
 
 setupTests parser file = do
-  let path = "./test/" ++ file
+  let path = "./test/uasm/" ++ file
   xs <- liftM lines $ readFile path
   mapM_ (\x -> (TP.parseTest parser x)) xs
