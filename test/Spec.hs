@@ -5,6 +5,7 @@ import Text.Parsec.Error
 import Text.Parsec.String
 import Control.Monad
 
+
 main :: IO ()
 main = do putStrLn "Testing parser..."
           go1 multilineComment "multi-line-comment.uasm"
@@ -30,7 +31,6 @@ main = do putStrLn "Testing parser..."
           go1 expr "decnum.uasm"
           go1 expr "charlit.uasm"
 
-          go1 binExpr "binexp.uasm"
           go1 expr "binexp.uasm"
           
 go1 x y = processResults $ setupTest x y

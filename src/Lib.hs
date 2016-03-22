@@ -1,5 +1,4 @@
 {-# LANGUAGE RankNTypes #-}
-{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE MonomorphismRestriction #-}
 {-# LANGUAGE FlexibleContexts #-}
 
@@ -7,10 +6,13 @@ module Lib where
 
 import Text.Parsec
 import Text.Parsec.Char
-import Text.Parsec.Expr
+--import Text.Parsec.Expr
 import Text.Parsec.String
 import Text.ParserCombinators.Parsec.Token
-
+import Text.ParserCombinators.Parsec.Expr
+import Text.ParserCombinators.Parsec.Language
+import qualified Text.ParserCombinators.Parsec.Token as Token
+import Data.Functor.Identity
 someFunc :: IO ()
 someFunc = putStrLn "someFunc"
   
@@ -79,51 +81,72 @@ include = do string ".include"
 unaryMinus :: Parser Char
 unaryMinus = char '-'
 
-bitWiseComplement :: Parser String
-bitWiseComplement = string "~"
+bitWiseComplement :: Parser Binop
+bitWiseComplement = do string "~"
+                       return BitwiseComplement
+  
+bitWiseAnd :: Parser Binop
+bitWiseAnd = do string "&"
+                return BitWiseAnd
 
-bitWiseAnd :: Parser String
-bitWiseAnd = string "&"
+bitWiseOr :: Parser Binop
+bitWiseOr = do string "|"
+               return BitWiseOr
 
-bitWiseOr :: Parser String
-bitWiseOr = string "|"
+addition :: Parser Binop
+addition = do string "+"
+              return Addition
 
-addition :: Parser String
-addition = string "+"
+subtraction :: Parser Binop
+subtraction = do string "-"
+                 return Subtraction
 
-subtraction :: Parser String
-subtraction = string "-"
+multiplication :: Parser Binop
+multiplication = do string "*"
+                    return Multiplication
 
-multiplication :: Parser String
-multiplication = string "*"
+division :: Parser Binop
+division = do string "/"
+              return Division
 
-division :: Parser String
-division = string "/"
+modulo :: Parser Binop
+modulo = do string "%"
+            return Modulo
 
-modulo :: Parser String
-modulo = string "%"
+rightShift :: Parser Binop
+rightShift = do string ">>"
+                return RightShift
 
-rightShift :: Parser String
-rightShift = string ">>"
+leftShift :: Parser Binop
+leftShift = do string "<<"
+               return LeftShift
 
-leftShift :: Parser String
-leftShift = string "<<"
-
-data Binop = Binop String deriving (Show, Eq)
+data Binop = BitwiseComplement
+           | BitWiseAnd
+           | BitWiseOr
+           | Addition
+           | Subtraction
+           | Multiplication
+           | Division
+           | Modulo
+           | RightShift
+           | LeftShift
+             deriving (Show, Eq)
 
 binop :: Parser Binop
-binop = do op <- choice [ bitWiseComplement
-                        , bitWiseAnd
-                        , bitWiseOr
-                        , addition
-                        , subtraction
-                        , multiplication
-                        , division
-                        , modulo
-                        , rightShift
-                        , leftShift
-                        ]
-           return $ Binop op
+binop = do choice [ bitWiseComplement
+                  , bitWiseAnd
+                  , bitWiseOr
+                  , addition
+                  , subtraction
+                  , multiplication
+                  , division
+                  , modulo
+                  , rightShift
+                  , leftShift
+                  ]
+                          
+
 
 ------------------------------------------------------------------
 hexNum :: Parser Integer 
@@ -167,55 +190,53 @@ data Expr = BinExpr Binop Expr Expr
           | NumExpr LitNum
           | IdentExpr Ident
           | CharExpr LitChar
+          | Neg Expr
             deriving (Show, Eq)
 
-numExpr :: Parser Expr
-numExpr = do n <- try litNum
+numExpr = do n <- litNum
              return $ NumExpr n
 
-charExpr :: Parser Expr
-charExpr = do c <- try litChar
+identExpr = do n <- ident
+               return $ IdentExpr n
+
+charExpr = do c <- litChar
               return $ CharExpr c
-             
-identExpr :: Parser Expr
-identExpr = do c <- try ident
-               return $ IdentExpr c
-
-term1 = try numExpr <|> try identExpr <|> try charExpr
-term2 = do char '('
-           t <- term
-           char ')'
-           return t
-term = try term2 <|> try term1
-           
-binExpr1 = do t <- term
-              restExpr t <|> emptyExpr t
-              
-binExpr2 = do char '('
-              t <- term
-              result <- restExpr t <|> emptyExpr t
-              char ')'
-              return result
-              
-
-binExpr = try binExpr2 <|> try binExpr1
-
-restExpr1 t = do b <- binop
-                 s <- binExpr <|> term
-                 return $ BinExpr b t s
-restExpr2 t = par (restExpr1 t)
-restExpr t = (try $ restExpr1 t) <|> (try $ restExpr2 t)
-
-
-emptyExpr t = return t                
-
-par x = do char '('
-           y <- x
-           char ')'
-           return y
-           
-expr = try (par binExpr) <|> try binExpr
 ------------------------------------------------------------------
 data Macro = MacroLine Ident ArgList [Expr]
-
   
+languageDef =
+  emptyDef { Token.commentStart    = "/*"
+           , Token.commentEnd      = "*/"
+           , Token.commentLine     = "//"
+           , Token.identStart      = letter
+           , Token.identLetter     = alphaNum
+           , Token.reservedNames   = []
+           , Token.reservedOpNames = ["+", "-", "*", "/"]
+           }
+
+lexer :: GenTokenParser String u Data.Functor.Identity.Identity
+lexer = Token.makeTokenParser languageDef
+
+resOp = Token.reservedOp lexer
+
+expr :: Parser Expr
+expr = buildExpressionParser ops term
+opNeg :: Parser (Expr -> Expr)
+opNeg = do string "-"
+           return Neg
+
+ops = [ [ Prefix (resOp "-" >> return (Neg))]
+      , [ Infix (resOp "*" >> return (BinExpr Multiplication)) AssocLeft
+        , Infix (resOp "/" >> return (BinExpr Division )) AssocLeft
+        , Infix (resOp "+" >> return (BinExpr Addition )) AssocLeft
+        , Infix (resOp "-" >> return (BinExpr Subtraction )) AssocLeft
+        ]]
+
+term = parens lexer expr <|> numExpr <|> identExpr <|> charExpr
+
+-- parseString :: String -> Expr
+-- parseString str =
+--    case parse expr "" str of
+--      Left e  -> error $ show e
+--      Right r -> r
+
