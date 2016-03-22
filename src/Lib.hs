@@ -145,8 +145,8 @@ decNum = do d <- many1 digit
 ------------------------------------------------------------------            
 data LitChar = LitChar Char deriving (Show, Eq)
 
-charLit :: Parser LitChar
-charLit = do let quote = char '\''
+litChar :: Parser LitChar
+litChar = do let quote = char '\''
              quote
              c <- noneOf "'"
              quote
@@ -166,23 +166,28 @@ litNum = do neg <- optionMaybe unaryMinus
 data Expr = BinExpr Binop Expr Expr
           | NumExpr LitNum
           | IdentExpr Ident
+          | CharExpr LitChar
             deriving (Show, Eq)
 
 numExpr :: Parser Expr
 numExpr = do n <- try litNum
              return $ NumExpr n
-             
+
 charExpr :: Parser Expr
-charExpr = do c <- try ident
-              return $ IdentExpr c
+charExpr = do c <- try litChar
+              return $ CharExpr c
+             
+identExpr :: Parser Expr
+identExpr = do c <- try ident
+               return $ IdentExpr c
 
+term = try numExpr <|> try identExpr <|> try charExpr
 
-
-binExpr = do t <- try numExpr <|> try charExpr
+binExpr = do t <- term
              restExpr t <|> emptyExpr t
              
 restExpr t = do b <- binop
-                s <- try binExpr <|> try numExpr <|> try charExpr 
+                s <- binExpr <|> term
                 return $ BinExpr b t s
 
 emptyExpr t = return t                

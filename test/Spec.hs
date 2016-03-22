@@ -22,7 +22,7 @@ main = do putStrLn "Testing parser..."
           go1 numExpr "binnum.uasm"
           go1 numExpr "decnum.uasm"
           
-          go1 charLit "charlit.uasm" 
+          go1 litChar "charlit.uasm" 
           go1 charExpr "charlit.uasm"
 
           -- go1 expr "hexnum.uasm"
