@@ -36,6 +36,8 @@ main = do putStrLn "Testing parser..."
 
           go1 macroLine "macro1.uasm"
           
+          go1 assn "assignment1.uasm"
+          
 go1 x y = processResults $ setupTest x y
 goN x y = setupTests x y
              

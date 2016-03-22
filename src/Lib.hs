@@ -31,13 +31,21 @@ keywordMacro :: Parser String
 keywordMacro = do string ".macro"
 
 ------------------------------------------------------------------
-data Ident = Ident String deriving (Show, Eq)
+data Ident = Ident String
+           | CurInstruction 
+             deriving (Show, Eq)
+                    
+ident1 :: Parser Ident
+ident1 = do part1 <- upper <|> lower
+            part2 <- many $ alphaNum <|> oneOf "_."
+            return $ Ident (part1 : part2)
+            
+ident2 :: Parser Ident
+ident2 = do char '.'
+            return $ CurInstruction
 
-ident :: Parser Ident
-ident = do part1 <- upper <|> lower
-           part2 <- many $ alphaNum <|> oneOf "_."
-           return $ Ident (part1 : part2)
 
+ident = ident1 <|> ident2
 ------------------------------------------------------------------
 data ArgList = ArgList [Ident] deriving (Show, Eq)
 
@@ -245,7 +253,9 @@ expr :: Parser Expr
 expr = buildExpressionParser ops term2
            
 ------------------------------------------------------------------
-data Macro = MacroLine Ident ArgList [Expr] deriving (Show, Eq)
+data Macro = MacroLine Ident ArgList [Expr]
+           | MacroBlock Ident ArgList [Stmt]
+           deriving (Show, Eq)
 
 -- todo : let argList take 0 args
 
@@ -260,4 +270,17 @@ macroLine = do string ".macro"
                spacebars
                es <- (many1 expr) 
                return $ MacroLine macroName args es
-           
+
+
+
+
+data Stmt = Assign Ident Expr deriving (Show, Eq)
+
+assn :: Parser Stmt
+assn = do name <- ident
+          spaces
+          string "="
+          spaces
+          e <- expr
+          return $ Assign name e
+  
