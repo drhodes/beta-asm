@@ -1,0 +1,6 @@
+.macro extract_field1 (RA, M, N, RB) {
+       a = 10      
+       b = 30 
+       SHLC(RA, 31-M, RB) 
+       SHRC(RB, 31-(M-N), RB) 
+}

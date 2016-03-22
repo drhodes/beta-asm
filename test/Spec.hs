@@ -5,9 +5,9 @@ import Text.Parsec.Error
 import Text.Parsec.String
 import Control.Monad
 
-
 main :: IO ()
-main = do putStrLn "Testing parser..."
+main = do putStrLn "--------------------------------------------"
+          putStrLn "Testing parser..."
           go1 multilineComment "multi-line-comment.uasm"
           go1 lineComment  "line-comment.uasm"
           go1 keywordMacro "keyword-macro.uasm" 
@@ -38,6 +38,13 @@ main = do putStrLn "Testing parser..."
           
           go1 assn "assignment1.uasm"
           
+          go1 callStmt "call.uasm"
+          go1 callExpr "call.uasm"
+
+          go1 macroBlock "macroblock.uasm"
+          go1 macro "macroblock.uasm"
+          go1 macro "macro1.uasm"
+          
 go1 x y = processResults $ setupTest x y
 goN x y = setupTests x y
              
@@ -45,7 +52,7 @@ processResults (file, result) = do
   r <- result
   case r of
     Left err -> putStrLn $ "Fail: " ++ file ++ "\n" ++ (show err)
-    Right msg -> putStrLn $ "Pass: " ++ file ++ ": " ++ (show msg)
+    Right msg -> putStrLn $ "Pass: " ++ file -- ++ ": " ++ (show msg)
   
 setupTest parser file =
   (file, parseFromFile parser ("./test/uasm/" ++ file))

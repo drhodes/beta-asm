@@ -12,16 +12,20 @@ import Text.ParserCombinators.Parsec.Expr
 import Text.ParserCombinators.Parsec.Language
 import qualified Text.ParserCombinators.Parsec.Token as Token
 import Data.Functor.Identity
-  
+
+spacex = do many (char ' ' <|> char '\t')
+            return ()
+
+
 lineComment :: Parser String
-lineComment = do spaces
+lineComment = do spacex
                  string "//"
                  comment <- many $ noneOf "\n"
                  newline
                  return comment
                  
 multilineComment :: Parser String
-multilineComment = do spaces
+multilineComment = do spacex
                       string "/*"
                       comment <- many $ noneOf "*/"
                       string "*/"
@@ -52,9 +56,9 @@ data ArgList = ArgList [Ident] deriving (Show, Eq)
 argList :: Parser ArgList
 argList = do char '('             
              let spacedIdent = do {
-                   ; spaces
+                   ; spacex
                    ; x <- ident
-                   ; spaces
+                   ; spacex
                    ; return x
                    }
              args <- sepBy1 spacedIdent (char ',')
@@ -66,7 +70,7 @@ data Label = Label Ident deriving (Show, Eq)
 
 label :: Parser Label
 label = do x <- ident
-           spaces
+           spacex
            char ':'
            return $ Label x
 
@@ -75,7 +79,7 @@ data Include = Include String deriving (Show, Eq)
 
 include :: Parser Include
 include = do string ".include"
-             spaces
+             spacex
              char '"'
              filename <- many $ (alphaNum <|> oneOf "._" <?> "invalid file name")
              char '"'
@@ -195,6 +199,7 @@ data Expr = BinExpr Binop Expr Expr
           | IdentExpr Ident
           | CharExpr LitChar
           | Neg Expr
+          | Call Ident [Expr]
             deriving (Show, Eq)
 
 numExpr = do n <- litNum
@@ -221,10 +226,15 @@ languageDef =
                                      ]
            }
 
+
+
 lexer :: GenTokenParser String u Data.Functor.Identity.Identity
-lexer = Token.makeTokenParser languageDef
+lexer = (Token.makeTokenParser languageDef){whiteSpace = spacex}
+
 
 resOp = Token.reservedOp lexer
+
+
 
 ops = [ [ Prefix (resOp "-" >> return (Neg))]
       , [ Infix (resOp "*" >> return (BinExpr Multiplication)) AssocLeft
@@ -244,9 +254,9 @@ ops = [ [ Prefix (resOp "-" >> return (Neg))]
         ]]
 
 term1 = parens lexer expr <|> numExpr <|> identExpr <|> charExpr
-term2 = do spaces
+term2 = do spacex
            t <- term1
-           spaces
+           spacex
            return t
 
 expr :: Parser Expr
@@ -259,28 +269,73 @@ data Macro = MacroLine Ident ArgList [Expr]
 
 -- todo : let argList take 0 args
 
-spacebars :: Parser ()
-spacebars = many (char '\t' <|> char ' ') >> return ()
-
 macroLine = do string ".macro"
-               spacebars
+               spacex
                macroName <- ident
-               spacebars
+               spacex
                args <- argList
-               spacebars
+               spacex
                es <- (many1 expr) 
                return $ MacroLine macroName args es
 
 
+macroBlock = do string ".macro"
+                spacex
+                name <- ident
+                spacex
+                args <- argList
+                spacex
+                char '{'
+                ss <- many (do spaces 
+                               s <- stmt
+                               spaces
+                               return s )
+                spaces
+                char '}'
+                return $ MacroBlock name args ss
 
+macro = do try macroLine <|> macroBlock                  
 
-data Stmt = Assign Ident Expr deriving (Show, Eq)
-
+------------------------------------------------------------------
+data Stmt = AssignStmt Ident Expr
+          | ExprStmt Expr
+          | IdentStmt Ident
+          deriving (Show, Eq)
+                             
 assn :: Parser Stmt
 assn = do name <- ident
-          spaces
+          spacex
           string "="
-          spaces
+          spacex
           e <- expr
-          return $ Assign name e
-  
+          return $ AssignStmt name e
+
+stmt :: Parser Stmt
+stmt = try assn <|> try callStmt <|> identStmt
+
+callStmt = do
+  c <- callExpr
+  return $ ExprStmt c
+
+identStmt = do
+  c <- ident
+  return $ IdentStmt c
+
+
+callExpr :: Parser Expr
+callExpr = do
+  name <- ident
+  spacex
+  char '('             
+  let spacedExpr = do {
+        ; spacex
+        ; x <- expr
+        ; spacex
+        ; return x
+        }
+  args <- sepBy1 spacedExpr (char ',')
+  char ')'
+  return $ Call name args
+
+
+
