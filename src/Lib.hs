@@ -49,7 +49,6 @@ argList = do char '('
                    ; spaces
                    ; return x
                    }
-                                  
              args <- sepBy1 spacedIdent (char ',')
              char ')'
              return $ ArgList args
@@ -199,7 +198,6 @@ identExpr = do n <- ident
 charExpr = do c <- litChar
               return $ CharExpr c
 ------------------------------------------------------------------
-data Macro = MacroLine Ident ArgList [Expr]
   
 languageDef =
   emptyDef { Token.commentStart    = "/*"
@@ -247,3 +245,19 @@ expr :: Parser Expr
 expr = buildExpressionParser ops term2
            
 ------------------------------------------------------------------
+data Macro = MacroLine Ident ArgList [Expr] deriving (Show, Eq)
+
+-- todo : let argList take 0 args
+
+spacebars :: Parser ()
+spacebars = many (char '\t' <|> char ' ') >> return ()
+
+macroLine = do string ".macro"
+               spacebars
+               macroName <- ident
+               spacebars
+               args <- argList
+               spacebars
+               es <- (many1 expr) 
+               return $ MacroLine macroName args es
+           

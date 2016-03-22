@@ -33,7 +33,8 @@ main = do putStrLn "Testing parser..."
 
           go1 expr "binexp.uasm"
           go1 expr "parenbinexp.uasm"
-          
+
+          go1 macroLine "macro1.uasm"
           
 go1 x y = processResults $ setupTest x y
 goN x y = setupTests x y
