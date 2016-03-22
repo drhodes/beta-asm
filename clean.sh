@@ -1,1 +1,1 @@
-echo $(find ./ | grep \~)
+rm -f $(find ./ | grep \~)
