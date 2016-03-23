@@ -8,8 +8,6 @@ import Control.Monad
 main :: IO ()
 main = do putStrLn "--------------------------------------------"
           putStrLn "Testing parser..."
-          go1 multilineComment "multi-line-comment.uasm"
-          go1 lineComment  "line-comment.uasm"
           go1 keywordMacro "keyword-macro.uasm" 
           go1 ident "ident1.uasm" 
           go1 argList "arglist.uasm" 
