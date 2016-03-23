@@ -36,20 +36,24 @@ keywordMacro = do string ".macro"
 
 ------------------------------------------------------------------
 data Ident = Ident String
-           | CurInstruction 
+           | CurInstruction
+           | IdMacro
              deriving (Show, Eq)
                     
 ident1 :: Parser Ident
 ident1 = do part1 <- upper <|> lower
-            part2 <- many $ alphaNum <|> oneOf "_."
+            part2 <- many $ alphaNum <|> oneOf "_"
             return $ Ident (part1 : part2)
+
+ident2 = string ".macro" >> return IdMacro
+
             
-ident2 :: Parser Ident
-ident2 = do char '.'
+ident3 :: Parser Ident
+ident3 = do char '.'
             return $ CurInstruction
 
 
-ident = ident1 <|> ident2
+ident = ident1 <|> ident2 <|> ident3
 ------------------------------------------------------------------
 data ArgList = ArgList [Ident] deriving (Show, Eq)
 
@@ -69,9 +73,11 @@ argList = do char '('
 data Label = Label Ident deriving (Show, Eq)
 
 label :: Parser Label
-label = do x <- ident
+label = do spacex
+           x <- ident
            spacex
            char ':'
+           spaces
            return $ Label x
 
 ------------------------------------------------------------------
@@ -313,14 +319,8 @@ assn = do name <- ident
 stmt :: Parser Stmt
 stmt = try assn <|> try callStmt <|> identStmt
 
-callStmt = do
-  c <- callExpr
-  return $ ExprStmt c
-
-identStmt = do
-  c <- ident
-  return $ IdentStmt c
-
+callStmt = callExpr >>= (return . ExprStmt)
+identStmt = ident >>= (return . IdentStmt)
 
 callExpr :: Parser Expr
 callExpr = do
@@ -337,5 +337,23 @@ callExpr = do
   char ')'
   return $ Call name args
 
+------------------------------------------------------------------
+data TopLevel = TopStmt Stmt
+              | TopMacro Macro
+              | TopLabel Label
+                deriving (Show, Eq)
+
+topLevel1 = return . TopStmt  =<< stmt
+topLevel2 = return . TopMacro =<< macro
+topLevel3 = return . TopLabel =<< Lib.label
+topLevelN = try topLevel3 <|> try topLevel1 <|> try topLevel2
+
+topLevels =
+  do spaces
+     top <- topLevelN
+     spaces
+     return top
+
+topLevel = many topLevels
 
 

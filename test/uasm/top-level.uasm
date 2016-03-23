@@ -1,0 +1,8 @@
+start:
+
+PUSH(BP)                       
+array = R0
+
+HexDig: LONG('0') LONG('1') LONG('2') LONG('3') LONG('4') LONG('5')
+        LONG('6') LONG('7') LONG('8') LONG('9') LONG('A') LONG('B')
+        LONG('C') LONG('D') LONG('E') LONG('F')
