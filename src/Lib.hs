@@ -16,20 +16,25 @@ import Data.Functor.Identity
 spacex = do many (char ' ' <|> char '\t')
             return ()
 
+data Comment = LineComment String
+             | BlockComment String
+               deriving (Show, Eq)
 
-lineComment :: Parser String
+lineComment :: Parser Comment
 lineComment = do spacex
                  string "//"
                  comment <- many $ noneOf "\n"
                  newline
-                 return comment
+                 return $ LineComment comment
                  
-multilineComment :: Parser String
+multilineComment :: Parser Comment
 multilineComment = do spacex
                       string "/*"
                       comment <- many $ noneOf "*/"
                       string "*/"
-                      return comment
+                      return $ BlockComment comment
+
+comment = many $ lineComment <|> multilineComment
 
 keywordMacro :: Parser String
 keywordMacro = do string ".macro"
@@ -65,7 +70,7 @@ argList = do char '('
                    ; spacex
                    ; return x
                    }
-             args <- sepBy1 spacedIdent (char ',')
+             args <- sepBy spacedIdent (char ',')
              char ')'
              return $ ArgList args
 
@@ -208,14 +213,10 @@ data Expr = BinExpr Binop Expr Expr
           | Call Ident [Expr]
             deriving (Show, Eq)
 
-numExpr = do n <- litNum
-             return $ NumExpr n
+numExpr = return . NumExpr =<< litNum
+identExpr = return . IdentExpr =<< ident
+charExpr = return . CharExpr =<< litChar
 
-identExpr = do n <- ident
-               return $ IdentExpr n
-
-charExpr = do c <- litChar
-              return $ CharExpr c
 ------------------------------------------------------------------
   
 languageDef =
@@ -233,14 +234,10 @@ languageDef =
            }
 
 
-
 lexer :: GenTokenParser String u Data.Functor.Identity.Identity
 lexer = (Token.makeTokenParser languageDef){whiteSpace = spacex}
 
-
 resOp = Token.reservedOp lexer
-
-
 
 ops = [ [ Prefix (resOp "-" >> return (Neg))]
       , [ Infix (resOp "*" >> return (BinExpr Multiplication)) AssocLeft
@@ -267,13 +264,11 @@ term2 = do spacex
 
 expr :: Parser Expr
 expr = buildExpressionParser ops term2
-           
+
 ------------------------------------------------------------------
 data Macro = MacroLine Ident ArgList [Expr]
            | MacroBlock Ident ArgList [Stmt]
            deriving (Show, Eq)
-
--- todo : let argList take 0 args
 
 macroLine = do string ".macro"
                spacex
@@ -313,7 +308,7 @@ assn = do name <- ident
           spacex
           string "="
           spacex
-          e <- expr
+          e <- expr          
           return $ AssignStmt name e
 
 stmt :: Parser Stmt
@@ -333,7 +328,7 @@ callExpr = do
         ; spacex
         ; return x
         }
-  args <- sepBy1 spacedExpr (char ',')
+  args <- sepBy spacedExpr (char ',')
   char ')'
   return $ Call name args
 
