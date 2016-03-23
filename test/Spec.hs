@@ -51,19 +51,42 @@ main = do putStrLn "--------------------------------------------"
           --go1 callExpr "intercomment.uasm"
           
 
-go1 x y = processResults $ setupTest x y
-goN x y = setupTests x y
+go1 x y = setupTest x y >>= processResults
              
+processResults :: (Show a, Show a1) => ([Char], Either a a1) -> IO ()
 processResults (file, result) = do
-  r <- result
-  case r of
+  case result of
     Left err -> putStrLn $ "Fail: " ++ file ++ "\n" ++ (show err)
     Right msg -> putStrLn $ "Pass: " ++ file ++ ": " ++ (show msg)
   
-setupTest parser file =
-  (file, parseFromFile parser ("./test/uasm/" ++ file))
+setupTest :: TP.Parsec [Char] () a -> [Char] -> IO ([Char], Either ParseError a)
+setupTest parser file = do
+  txt <- readFile $ "./test/uasm/" ++ file
+  let t = eraseComments txt
+  let r = TP.parse parser file t
+  return (file, r)
 
-setupTests parser file = do
-  let path = "./test/uasm/" ++ file
-  xs <- liftM lines $ readFile path
-  mapM_ (\x -> (TP.parseTest parser x)) xs
+eraseLineComment [] _ = []
+eraseLineComment src@(c:str) inComment =
+  if take 2 src == "//"
+  then "  " ++ (eraseLineComment (drop 2 src) True)
+  else if c == '\n'
+       then c:(eraseLineComment str False)
+       else if inComment
+            then ' ':(eraseLineComment str True)
+            else c:(eraseLineComment str False)
+
+eraseBlockComment [] _ = []
+eraseBlockComment src@(c:str) inComment =
+  if take 2 src == "/*" && not inComment
+  then "  " ++ (eraseBlockComment (drop 2 src) True)       
+  else if take 2 src == "*/" && inComment
+       then "  " ++ (eraseBlockComment (drop 2 src) False)
+       else if inComment               
+            then ' ':(eraseBlockComment str inComment)
+            else c:(eraseBlockComment str inComment)
+
+
+eraseComments src =
+  (eraseLineComment
+   (eraseBlockComment src False) False)
