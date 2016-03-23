@@ -45,9 +45,12 @@ main = do putStrLn "--------------------------------------------"
           go1 macroBlock "macroblock.uasm"
           go1 macro "macroblock.uasm"
           go1 macro "macro1.uasm"
-
+          
           go1 topLevel "top-level.uasm"
           
+          --go1 callExpr "intercomment.uasm"
+          
+
 go1 x y = processResults $ setupTest x y
 goN x y = setupTests x y
              
@@ -55,7 +58,7 @@ processResults (file, result) = do
   r <- result
   case r of
     Left err -> putStrLn $ "Fail: " ++ file ++ "\n" ++ (show err)
-    Right msg -> putStrLn $ "Pass: " ++ file  -- ++ ": " ++ (show msg)
+    Right msg -> putStrLn $ "Pass: " ++ file ++ ": " ++ (show msg)
   
 setupTest parser file =
   (file, parseFromFile parser ("./test/uasm/" ++ file))

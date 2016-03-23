@@ -2,6 +2,7 @@
 {-# LANGUAGE MonomorphismRestriction #-}
 {-# LANGUAGE FlexibleContexts #-}
 
+
 module Lib where
 
 import Text.Parsec
@@ -28,13 +29,18 @@ lineComment = do spacex
                  return $ LineComment comment
                  
 multilineComment :: Parser Comment
-multilineComment = do spacex
+multilineComment = do spaces
                       string "/*"
-                      comment <- many $ noneOf "*/"
-                      string "*/"
+                      comment <- manyTill anyChar (string "*/")
+                      spaces
                       return $ BlockComment comment
 
-comment = many $ lineComment <|> multilineComment
+comment = try lineComment <|> multilineComment
+ic p = do many multilineComment
+          x <- p
+          many multilineComment
+          return x
+
 
 keywordMacro :: Parser String
 keywordMacro = do string ".macro"
@@ -51,14 +57,10 @@ ident1 = do part1 <- upper <|> lower
             return $ Ident (part1 : part2)
 
 ident2 = string ".macro" >> return IdMacro
+ident3 = char '.' >> return CurInstruction
 
-            
-ident3 :: Parser Ident
-ident3 = do char '.'
-            return $ CurInstruction
+ident = try ident1 <|> try ident2 <|> ident3
 
-
-ident = ident1 <|> ident2 <|> ident3
 ------------------------------------------------------------------
 data ArgList = ArgList [Ident] deriving (Show, Eq)
 
@@ -312,7 +314,8 @@ assn = do name <- ident
           return $ AssignStmt name e
 
 stmt :: Parser Stmt
-stmt = try assn <|> try callStmt <|> identStmt
+stmt = do s <- try assn <|> try callStmt <|> try identStmt
+          return s
 
 callStmt = callExpr >>= (return . ExprStmt)
 identStmt = ident >>= (return . IdentStmt)
@@ -336,19 +339,24 @@ callExpr = do
 data TopLevel = TopStmt Stmt
               | TopMacro Macro
               | TopLabel Label
+              | TopComment Comment
                 deriving (Show, Eq)
 
 topLevel1 = return . TopStmt  =<< stmt
 topLevel2 = return . TopMacro =<< macro
 topLevel3 = return . TopLabel =<< Lib.label
-topLevelN = try topLevel3 <|> try topLevel1 <|> try topLevel2
+topLevel4 = return . TopComment =<< comment
+topLevelN = do tl <- try topLevel3 <|> try topLevel1
+                                   <|> try topLevel2
+                                   <|> try topLevel4
+               return tl
 
 topLevels =
   do spaces
      top <- topLevelN
-     spaces
+     spaces     
      return top
 
-topLevel = many topLevels
+topLevel = many $ topLevels
 
 
