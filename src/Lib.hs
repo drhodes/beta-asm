@@ -22,11 +22,10 @@ spacex = do many (char ' ' <|> char '\t')
 keywordMacro :: Parser String
 keywordMacro = do string ".macro"
 
-debug = False
+debug = True
 dbg s = if debug
         then traceShowM s
         else return ()
-
 
 ------------------------------------------------------------------
 data Ident = Ident String
@@ -42,19 +41,29 @@ ident1 = do
 
 ident3 = do
   dbg "ident3"
-  char '.'
+  s <- char '.'
+  dbg s
   return CurInstruction
 
 ident = do
   dbg "ident"
-  choice [ try ident1
-         , ident3]
+  choice [ try ident3
+         , try ident1]
 
 ------------------------------------------------------------------
 data ArgList = ArgList [Ident] deriving (Show, Eq)
 
-argList :: Parser ArgList
-argList = do
+argListEmpty :: Parser ArgList
+argListEmpty = do
+  dbg "argListEmpty"
+  char '('
+  spacex
+  char ')'
+  return $ ArgList []
+
+argListSome :: Parser ArgList
+argListSome = do
+  dbg "argListSome"
   char '('             
   let spacedIdent = do {
         ; spacex
@@ -66,6 +75,9 @@ argList = do
   char ')'
   return $ ArgList args
 
+argList = argListSome <|> argListEmpty
+
+
 ------------------------------------------------------------------
 data Label = Label Ident deriving (Show, Eq)
 
@@ -76,7 +88,6 @@ label = do spacex
            char ':'
            spaces
            return $ Label x
-
 
 ------------------------------------------------------------------
 unaryMinus :: Parser Char
@@ -159,6 +170,9 @@ litNum = do
     Just _ -> -n
     Nothing -> n
 
+
+
+
 ------------------------------------------------------------------
 data Expr = BinExpr Binop Expr Expr
           | NumExpr LitNum
@@ -166,11 +180,19 @@ data Expr = BinExpr Binop Expr Expr
           | CharExpr LitChar
           | Neg Expr
           | Call Ident [Expr]
+          | CurInst
             deriving (Show, Eq)
+
+curInstExpr :: Parser Expr
+curInstExpr = do
+  dbg "curInstExpr"
+  n <- try $ string "."
+  return $ CurInst
 
 numExpr = do
   dbg "numExpr"
-  return . NumExpr =<< litNum
+  n <- try litNum
+  return $ NumExpr n
   
 identExpr = do
   dbg "identExpr"
@@ -179,25 +201,42 @@ identExpr = do
   
 charExpr = do
   dbg "charExpr"
-  return . CharExpr =<< litChar
+  c <- try litChar
+  return $ CharExpr c
 
 ------------------------------------------------------------------
+{-
+
+
+ expr    = buildExpressionParser table term
+         <?> "expression"
+
+ term    =  parens expr
+         <|> natural
+         <?> "simple expression"
+
+ table   = [ [prefix "-" negate, prefix "+" id ]
+           , [postfix "++" (+1)]
+           , [binary "*" (*) AssocLeft, binary "/" (div) AssocLeft ]
+           , [binary "+" (+) AssocLeft, binary "-" (-)   AssocLeft ]
+           ]
+
+ binary  name fun assoc = Infix (do{ reservedOp name; return fun }) assoc
+ prefix  name fun       = Prefix (do{ reservedOp name; return fun })
+ postfix name fun       = Postfix (do{ reservedOp name; return fun })
+
+-}
+
   
 languageDef =
-  emptyDef { Token.commentStart    = "/*"
-           , Token.commentEnd      = "*/"
-           , Token.commentLine     = "//"
-           , Token.identStart      = letter
-           , Token.identLetter     = alphaNum
-           , Token.reservedNames   = []
-           , Token.reservedOpNames = [ "+", "-", "*", "/"
+  emptyDef { Token.reservedOpNames = [ "+", "-", "*", "/"
                                      , "~", "&", "|", "+"
                                      , "-", "*", "/", "%"
                                      , ">>", "<<" 
-                                     ]
+                                     ]             
            }
-
-
+  
+  
 lexer :: GenTokenParser String u Data.Functor.Identity.Identity
 lexer = (Token.makeTokenParser languageDef){whiteSpace = spacex}
 
@@ -222,12 +261,13 @@ ops = [ [ Prefix (resOp "-" >> return (Neg))]
 
 term1 = do
   dbg "term1"
-  try $ choice [ parens lexer expr
-               , try numExpr
-               , try charExpr
-               , try callExpr
-               , try identExpr
-               ]
+  choice [ try $ parens lexer expr
+         , try curInstExpr
+         , try callExpr
+         , try identExpr
+         , try numExpr
+         , try charExpr
+         ]
     
 term2 = do
   dbg "term2"
@@ -242,7 +282,7 @@ expr = do
   buildExpressionParser ops term2
 
 ------------------------------------------------------------------
-data Macro = MacroLine Ident ArgList [Expr]
+data Macro = MacroLine Ident ArgList [Stmt]
            | MacroBlock Ident ArgList [Stmt]
            deriving (Show, Eq)
 
@@ -255,7 +295,7 @@ macroLine = do
   args <- argList
   spacex
   es <- many1 (do spacex
-                  s <- expr
+                  s <- stmt
                   spacex
                   return s)
   return $ MacroLine macroName args es
@@ -291,6 +331,7 @@ macro = do try macroLine <|> try macroBlock
 data Stmt = AssignStmt Ident Expr
           | ExprStmt Expr
           | IdentStmt Ident
+          | ProcStmt Proc
           deriving (Show, Eq)
                              
 assn :: Parser Stmt
@@ -306,10 +347,15 @@ exprStmt = do
   dbg "exprStmt"
   expr >>= (return . ExprStmt)
 
+procStmt = do
+  dbg "procStmt"
+  proc >>= (return . ProcStmt)
+       
 stmt :: Parser Stmt
 stmt = do
   dbg "stmt"
   s <- choice [ try assn
+              , try procStmt
               , try exprStmt
               , try callStmt
               , try identStmt
@@ -323,8 +369,6 @@ callStmt = do
 identStmt = do
   dbg "identStmt"
   ident >>= (return . IdentStmt)
-
-
 
 exprListEmpty :: Parser [Expr]
 exprListEmpty = do
@@ -355,7 +399,7 @@ callExpr = do
   dbg "In: callExpr"
   name <- ident <?> "Failed to get identifier of call expression"
   spacex
-  elist <- exprList <|> exprListEmpty
+  elist <- try exprList <|> try exprListEmpty
   return $ Call name elist
 
 ------------------------------------------------------------------

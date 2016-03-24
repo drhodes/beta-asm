@@ -16,39 +16,33 @@ main = do putStrLn "--------------------------------------------"
           -- go1 hexNum "hexnum.uasm"
           -- go1 binNum "binnum.uasm"
           -- go1 decNum "decnum.uasm"
-          
           -- go1 numExpr "hexnum.uasm"
           -- go1 numExpr "binnum.uasm"
           -- go1 numExpr "decnum.uasm"
-          
           -- go1 litChar "charlit.uasm" 
           -- go1 charExpr "charlit.uasm"
-
           -- go1 expr "hexnum.uasm"
           -- go1 expr "binnum.uasm"
           -- go1 expr "decnum.uasm"
           -- go1 expr "charlit.uasm"
-
           -- go1 expr "binexp.uasm"
           -- go1 expr "parenbinexp.uasm"
-
           -- go1 macroLine "macro1.uasm"
-          
           -- go1 assn "assignment1.uasm"
-          
           -- go1 callStmt "call.uasm"
           -- go1 callExpr "call.uasm"
           -- go1 callExpr "arglist1.uasm" 
-
           -- go1 macroBlock "macroblock.uasm"
           -- go1 macro "macroblock.uasm"
           -- go1 macro "macro1.uasm"
-          
           -- go1 topLevel "top-level.uasm"
           -- go1 callExpr "intercomment.uasm"
-          
-          go1 topLevel "prog1.uasm"
-          
+          -- go1 topLevel "prog1.uasm"
+          -- go1 macroLine "top-level2.uasm"
+          -- go1 macro "betaop.uasm"
+          -- go1 topLevel "betaop.uasm"
+          go1 expr "beta-abr-expr.uasm"
+          --go1 topLevel "betaabr.uasm"
 
 go1 x y = setupTest x y >>= processResults
   
@@ -82,7 +76,6 @@ eraseBlockComment src@(c:str) inComment =
        else if inComment               
             then ' ':(eraseBlockComment str inComment)
             else c:(eraseBlockComment str inComment)
-
 
 eraseComments src =
   (eraseLineComment
