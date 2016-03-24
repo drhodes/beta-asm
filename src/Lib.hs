@@ -5,76 +5,66 @@
 
 module Lib where
 
-import Text.Parsec
-import Text.Parsec.Char
-import Text.Parsec.String
-import Text.ParserCombinators.Parsec.Token
-import Text.ParserCombinators.Parsec.Expr
-import Text.ParserCombinators.Parsec.Language
+import           Data.Functor.Identity
+import           Debug.Trace
+import           Text.Parsec
+import           Text.Parsec.Char
+import           Text.Parsec.String
+import           Text.ParserCombinators.Parsec.Char
+import           Text.ParserCombinators.Parsec.Expr
+import           Text.ParserCombinators.Parsec.Language
+import           Text.ParserCombinators.Parsec.Token
 import qualified Text.ParserCombinators.Parsec.Token as Token
-import Data.Functor.Identity
 
 spacex = do many (char ' ' <|> char '\t')
             return ()
 
-data Comment = LineComment String
-             | BlockComment String
-               deriving (Show, Eq)
-
-lineComment :: Parser Comment
-lineComment = do spacex
-                 string "//"
-                 comment <- many $ noneOf "\n"
-                 newline
-                 return $ LineComment comment
-                 
-multilineComment :: Parser Comment
-multilineComment = do spaces
-                      string "/*"
-                      comment <- manyTill anyChar (string "*/")
-                      spaces
-                      return $ BlockComment comment
-
-comment = try lineComment <|> multilineComment
-ic p = do many multilineComment
-          x <- p
-          many multilineComment
-          return x
-
-
 keywordMacro :: Parser String
 keywordMacro = do string ".macro"
+
+debug = False
+dbg s = if debug
+        then traceShowM s
+        else return ()
+
 
 ------------------------------------------------------------------
 data Ident = Ident String
            | CurInstruction
-           | IdMacro
              deriving (Show, Eq)
                     
 ident1 :: Parser Ident
-ident1 = do part1 <- upper <|> lower
-            part2 <- many $ alphaNum <|> oneOf "_"
-            return $ Ident (part1 : part2)
+ident1 = do
+  dbg "ident1"
+  part1 <- upper <|> lower
+  part2 <- many $ alphaNum <|> oneOf "_"
+  return $ Ident (part1 : part2)
 
-ident2 = string ".macro" >> return IdMacro
-ident3 = char '.' >> return CurInstruction
+ident3 = do
+  dbg "ident3"
+  char '.'
+  return CurInstruction
 
-ident = try ident1 <|> try ident2 <|> ident3
+ident = do
+  dbg "ident"
+  choice [ try ident1
+         , ident3]
 
 ------------------------------------------------------------------
 data ArgList = ArgList [Ident] deriving (Show, Eq)
 
 argList :: Parser ArgList
-argList = do char '('             
-             let spacedIdent = do {
-                   ; spacex
-                   ; x <- ident
-                   ; spacex
-                   ; return x
-                   }
-             args <- sepBy spacedIdent (char ',')
-             char ')'
-             return $ ArgList args
+argList = do
+  char '('             
+  let spacedIdent = do {
+        ; spacex
+        ; x <- ident
+        ; spacex
+        ; return x
+        }
+  args <- sepBy spacedIdent (char ',')
+  char ')'
+  return $ ArgList args
 
 ------------------------------------------------------------------
 data Label = Label Ident deriving (Show, Eq)
@@ -87,60 +77,10 @@ label = do spacex
            spaces
            return $ Label x
 
-------------------------------------------------------------------
-data Include = Include String deriving (Show, Eq)
-
-include :: Parser Include
-include = do string ".include"
-             spacex
-             char '"'
-             filename <- many $ (alphaNum <|> oneOf "._" <?> "invalid file name")
-             char '"'
-             return $ Include filename
 
 ------------------------------------------------------------------
 unaryMinus :: Parser Char
 unaryMinus = char '-'
-
-bitWiseComplement :: Parser Binop
-bitWiseComplement = do string "~"
-                       return BitwiseComplement
-  
-bitWiseAnd :: Parser Binop
-bitWiseAnd = do string "&"
-                return BitWiseAnd
-
-bitWiseOr :: Parser Binop
-bitWiseOr = do string "|"
-               return BitWiseOr
-
-addition :: Parser Binop
-addition = do string "+"
-              return Addition
-
-subtraction :: Parser Binop
-subtraction = do string "-"
-                 return Subtraction
-
-multiplication :: Parser Binop
-multiplication = do string "*"
-                    return Multiplication
-
-division :: Parser Binop
-division = do string "/"
-              return Division
-
-modulo :: Parser Binop
-modulo = do string "%"
-            return Modulo
-
-rightShift :: Parser Binop
-rightShift = do string ">>"
-                return RightShift
-
-leftShift :: Parser Binop
-leftShift = do string "<<"
-               return LeftShift
 
 data Binop = BitwiseComplement
            | BitWiseAnd
@@ -154,57 +94,70 @@ data Binop = BitwiseComplement
            | LeftShift
              deriving (Show, Eq)
 
+opform op cons = do
+  dbg $ ": (" ++ op ++ ")"
+  string op
+  return cons
+
+                      
 binop :: Parser Binop
-binop = do choice [ bitWiseComplement
-                  , bitWiseAnd
-                  , bitWiseOr
-                  , addition
-                  , subtraction
-                  , multiplication
-                  , division
-                  , modulo
-                  , rightShift
-                  , leftShift
-                  ]
-                          
+binop = choice [ opform "~" BitwiseComplement
+               , opform "&" BitWiseAnd
+               , opform "|" BitWiseOr
+               , opform "+" Addition
+               , opform  "-" Subtraction
+               , opform "*" Multiplication
+               , opform "/" Division
+               , opform "%" Modulo
+               , opform ">>" RightShift
+               , opform "<<" LeftShift
+               ]
 
 
 ------------------------------------------------------------------
-hexNum :: Parser Integer 
-hexNum = do string "0x"
-            h <- many1 hexDigit
-            return (read ("0x" ++ h) :: Integer)
+hexNum = do
+  dbg "hexNum"
+  string "0x"
+  h <- many1 hexDigit
+  return (read ("0x" ++ h) :: Integer)
 
 binNum :: Parser Integer 
-binNum = do string "0b"
-            b <- many1 $ char '0' <|> char '1'
-            let x = sum [if n == '0' then 0 else 2^p |
-                         (n, p) <- zip (reverse b) [0..]]
-            return x
+binNum = do
+  dbg "binNum"
+  string "0b"
+  b <- many1 $ char '0' <|> char '1'
+  let x = sum [if n == '0' then 0 else 2^p |
+               (n, p) <- zip (reverse b) [0..]]
+  return x
 
 decNum :: Parser Integer        
-decNum = do d <- many1 digit
-            return (read d :: Integer)
+decNum = do
+  dbg "decNum"
+  d <- many1 digit
+  return (read d :: Integer)
             
 ------------------------------------------------------------------            
 data LitChar = LitChar Char deriving (Show, Eq)
 
-litChar :: Parser LitChar
-litChar = do let quote = char '\''
-             quote
-             c <- noneOf "'"
-             quote
-             return $ LitChar c
+litChar = do
+  dbg "litChar"
+  let quote = char '\''
+  quote
+  c <- noneOf "'"
+  quote
+  return $ LitChar c
 
 ------------------------------------------------------------------
 data LitNum = LitNum Integer deriving (Show, Eq)
 
 litNum :: Parser LitNum
-litNum = do neg <- optionMaybe unaryMinus
-            n <- choice [try binNum, try hexNum, try decNum]
-            return $ LitNum $ case neg of
-              Just _ -> -n
-              Nothing -> n
+litNum = do
+  dbg "litNum"
+  neg <- optionMaybe unaryMinus
+  n <- choice [try binNum, try hexNum, try decNum]
+  return $ LitNum $ case neg of
+    Just _ -> -n
+    Nothing -> n
 
 ------------------------------------------------------------------
 data Expr = BinExpr Binop Expr Expr
@@ -215,9 +168,18 @@ data Expr = BinExpr Binop Expr Expr
           | Call Ident [Expr]
             deriving (Show, Eq)
 
-numExpr = return . NumExpr =<< litNum
-identExpr = return . IdentExpr =<< ident
-charExpr = return . CharExpr =<< litChar
+numExpr = do
+  dbg "numExpr"
+  return . NumExpr =<< litNum
+  
+identExpr = do
+  dbg "identExpr"
+  n <- try ident
+  return $ IdentExpr n
+  
+charExpr = do
+  dbg "charExpr"
+  return . CharExpr =<< litChar
 
 ------------------------------------------------------------------
   
@@ -258,46 +220,72 @@ ops = [ [ Prefix (resOp "-" >> return (Neg))]
         , Infix (resOp "<<" >> return (BinExpr LeftShift)) AssocLeft
         ]]
 
-term1 = parens lexer expr <|> numExpr <|> identExpr <|> charExpr
-term2 = do spacex
-           t <- term1
-           spacex
-           return t
+term1 = do
+  dbg "term1"
+  try $ choice [ parens lexer expr
+               , try numExpr
+               , try charExpr
+               , try callExpr
+               , try identExpr
+               ]
+    
+term2 = do
+  dbg "term2"
+  spacex
+  t <- term1
+  spacex
+  return t
 
 expr :: Parser Expr
-expr = buildExpressionParser ops term2
+expr = do
+  dbg "expr"
+  buildExpressionParser ops term2
 
 ------------------------------------------------------------------
 data Macro = MacroLine Ident ArgList [Expr]
            | MacroBlock Ident ArgList [Stmt]
            deriving (Show, Eq)
 
-macroLine = do string ".macro"
-               spacex
-               macroName <- ident
-               spacex
-               args <- argList
-               spacex
-               es <- (many1 expr) 
-               return $ MacroLine macroName args es
+macroLine = do
+  dbg "macroLine"
+  string ".macro"
+  spacex
+  macroName <- ident
+  spacex
+  args <- argList
+  spacex
+  es <- many1 (do spacex
+                  s <- expr
+                  spacex
+                  return s)
+  return $ MacroLine macroName args es
 
-
-macroBlock = do string ".macro"
+macroBlock = do dbg "Entering macro block"
+                string ".macro"
                 spacex
                 name <- ident
+                dbg $ (show name)
                 spacex
                 args <- argList
+                dbg $ (show args)
                 spacex
                 char '{'
-                ss <- many (do spaces 
-                               s <- stmt
-                               spaces
-                               return s )
                 spaces
+                ss <- many stmts
+                dbg (show ss)
+                spaces
+                dbg $ "Done with macroblock ss"
                 char '}'
                 return $ MacroBlock name args ss
 
-macro = do try macroLine <|> macroBlock                  
+stmts = do dbg "stmts"
+           spaces
+           dbg "Entering stmts"
+           s <- try stmt
+           spaces
+           return s 
+
+macro = do try macroLine <|> try macroBlock                  
 
 ------------------------------------------------------------------
 data Stmt = AssignStmt Ident Expr
@@ -306,57 +294,139 @@ data Stmt = AssignStmt Ident Expr
           deriving (Show, Eq)
                              
 assn :: Parser Stmt
-assn = do name <- ident
+assn = do dbg "assn"
+          name <- ident
           spacex
           string "="
           spacex
           e <- expr          
           return $ AssignStmt name e
 
-stmt :: Parser Stmt
-stmt = do s <- try assn <|> try callStmt <|> try identStmt
-          return s
+exprStmt = do
+  dbg "exprStmt"
+  expr >>= (return . ExprStmt)
 
-callStmt = callExpr >>= (return . ExprStmt)
-identStmt = ident >>= (return . IdentStmt)
+stmt :: Parser Stmt
+stmt = do
+  dbg "stmt"
+  s <- choice [ try assn
+              , try exprStmt
+              , try callStmt
+              , try identStmt
+              ]
+  return s
+
+callStmt = do
+  dbg "callStmt"
+  callExpr >>= (return . ExprStmt)
+  
+identStmt = do
+  dbg "identStmt"
+  ident >>= (return . IdentStmt)
+
+
+
+exprListEmpty :: Parser [Expr]
+exprListEmpty = do
+  dbg "exprListEmpty"
+  char '('
+  spacex
+  char ')'
+  return []
+
+exprList :: Parser [Expr]
+exprList = do
+  dbg "exprList"
+  char '('
+  spacex
+  fst <- expr
+  rest <- many $ do spacex
+                    char ','
+                    spacex
+                    expr
+  spacex
+  char ')'
+  return (fst:rest)
+             
+
 
 callExpr :: Parser Expr
 callExpr = do
-  name <- ident
+  dbg "In: callExpr"
+  name <- ident <?> "Failed to get identifier of call expression"
   spacex
-  char '('             
-  let spacedExpr = do {
-        ; spacex
-        ; x <- expr
-        ; spacex
-        ; return x
-        }
-  args <- sepBy spacedExpr (char ',')
-  char ')'
-  return $ Call name args
+  elist <- exprList <|> exprListEmpty
+  return $ Call name elist
 
 ------------------------------------------------------------------
+data Proc = Include String
+          | Align (Maybe Expr)
+          | Ascii String
+          | Text String
+          | Breakpoint
+          | Protect
+          | Unprotect
+            deriving (Show, Eq)
+
+str = do spacex
+         char '"'
+         txt <- many $ noneOf "\""
+         char '"'
+         spacex
+         return txt
+
+align = do string ".align"           
+           return . Align =<< optionMaybe expr
+
+text = do string ".text"
+          s <- str
+          return $ Text s
+
+ascii = do string ".ascii"
+           s <- str
+           return $ Ascii s
+
+breakpoint :: Parser Proc
+breakpoint = string ".breakpoint" >> return Breakpoint
+
+protect :: Parser Proc  
+protect = string ".protect" >> return Protect
+
+include :: Parser Proc
+include = do string ".include"
+             spacex
+             char '"'
+             filename <- many $ (alphaNum <|> oneOf "._" <?> "invalid file name")
+             char '"'
+             return $ Include filename
+
+proc = choice [ try include
+              , try protect
+              , try breakpoint
+              , try ascii
+              , try text
+              , try align
+              ]
+
 data TopLevel = TopStmt Stmt
               | TopMacro Macro
               | TopLabel Label
-              | TopComment Comment
+              | TopProc Proc
                 deriving (Show, Eq)
 
-topLevel1 = return . TopStmt  =<< stmt
-topLevel2 = return . TopMacro =<< macro
-topLevel3 = return . TopLabel =<< Lib.label
-topLevel4 = return . TopComment =<< comment
-topLevelN = do tl <- try topLevel3 <|> try topLevel1
-                                   <|> try topLevel2
-                                   <|> try topLevel4
-               return tl
+topStmt = return . TopStmt  =<< stmt
+topMac = return . TopMacro =<< macro
+topProc = return . TopProc =<< proc
+topLbl = return . TopLabel =<< Lib.label
+topX = try topLbl <|> try topProc <|> try topMac <|> try topStmt
 
-topLevels =
-  do spaces
-     top <- topLevelN
-     spaces     
-     return top
+topLevels = do
+  dbg "topLevels"
+  spaces
+  top <- topX
+  spaces     
+  return top
 
 topLevel = many $ topLevels
 
-
+-- ".macro extract_field1 (RA, M, N, RB) { a = 10 \n b = 30 \n SHLC(RA, 31-M, RB) \n }"

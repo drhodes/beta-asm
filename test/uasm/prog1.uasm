@@ -1,0 +1,5 @@
+
+// Assemble words, little-endian:
+.macro WORD(x) x%0x100 (x>>8)%0x100
+.macro LONG(x) WORD(x) WORD(x >> 16)  // little-endian for Maybe
+.macro STORAGE(NWORDS)  . = .+(4*NWORDS)// Reserve NWORDS words of RAM
