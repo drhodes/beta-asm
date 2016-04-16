@@ -10,8 +10,9 @@ import           Debug.Trace
 import           Text.Parsec
 import           Text.Parsec.Char
 import           Text.Parsec.String
+import           Text.Parsec.Expr
 import           Text.ParserCombinators.Parsec.Char
-import           Text.ParserCombinators.Parsec.Expr
+import qualified Text.ParserCombinators.Parsec.Expr as E
 import           Text.ParserCombinators.Parsec.Language
 import           Text.ParserCombinators.Parsec.Token
 import qualified Text.ParserCombinators.Parsec.Token as Token
@@ -109,21 +110,19 @@ opform op cons = do
   dbg $ ": (" ++ op ++ ")"
   string op
   return cons
-
                       
 binop :: Parser Binop
 binop = choice [ opform "~" BitwiseComplement
                , opform "&" BitWiseAnd
                , opform "|" BitWiseOr
                , opform "+" Addition
-               , opform  "-" Subtraction
+               , opform "-" Subtraction
                , opform "*" Multiplication
                , opform "/" Division
                , opform "%" Modulo
                , opform ">>" RightShift
                , opform "<<" LeftShift
                ]
-
 
 ------------------------------------------------------------------
 hexNum = do
@@ -171,8 +170,6 @@ litNum = do
     Nothing -> n
 
 
-
-
 ------------------------------------------------------------------
 data Expr = BinExpr Binop Expr Expr
           | NumExpr LitNum
@@ -182,12 +179,6 @@ data Expr = BinExpr Binop Expr Expr
           | Call Ident [Expr]
           | CurInst
             deriving (Show, Eq)
-
-curInstExpr :: Parser Expr
-curInstExpr = do
-  dbg "curInstExpr"
-  n <- try $ string "."
-  return $ CurInst
 
 numExpr = do
   dbg "numExpr"
@@ -204,82 +195,140 @@ charExpr = do
   c <- try litChar
   return $ CharExpr c
 
-------------------------------------------------------------------
-{-
 
+exprListEmpty :: Parser [Expr]
+exprListEmpty = do
+  dbg "exprListEmpty"
+  char '('
+  spacex
+  char ')'
+  return []
 
- expr    = buildExpressionParser table term
-         <?> "expression"
+exprList :: Parser [Expr]
+exprList = do
+  dbg "exprList"
+  char '('
+  spacex
+  fst <- expr
+  rest <- many $ do spacex
+                    char ','
+                    spacex
+                    expr
+  spacex
+  char ')'
+  return (fst:rest)
 
- term    =  parens expr
-         <|> natural
-         <?> "simple expression"
-
- table   = [ [prefix "-" negate, prefix "+" id ]
-           , [postfix "++" (+1)]
-           , [binary "*" (*) AssocLeft, binary "/" (div) AssocLeft ]
-           , [binary "+" (+) AssocLeft, binary "-" (-)   AssocLeft ]
-           ]
-
- binary  name fun assoc = Infix (do{ reservedOp name; return fun }) assoc
- prefix  name fun       = Prefix (do{ reservedOp name; return fun })
- postfix name fun       = Postfix (do{ reservedOp name; return fun })
-
--}
-
-  
-languageDef =
-  emptyDef { Token.reservedOpNames = [ "+", "-", "*", "/"
-                                     , "~", "&", "|", "+"
-                                     , "-", "*", "/", "%"
-                                     , ">>", "<<" 
-                                     ]             
-           }
-  
-  
-lexer :: GenTokenParser String u Data.Functor.Identity.Identity
-lexer = (Token.makeTokenParser languageDef){whiteSpace = spacex}
-
-resOp = Token.reservedOp lexer
-
-ops = [ [ Prefix (resOp "-" >> return (Neg))]
-      , [ Infix (resOp "*" >> return (BinExpr Multiplication)) AssocLeft
-        , Infix (resOp "/" >> return (BinExpr Division )) AssocLeft
-        , Infix (resOp "+" >> return (BinExpr Addition )) AssocLeft
-        , Infix (resOp "-" >> return (BinExpr Subtraction )) AssocLeft
-        , Infix (resOp "~" >> return (BinExpr BitwiseComplement)) AssocLeft
-        , Infix (resOp "&" >> return (BinExpr BitWiseAnd)) AssocLeft
-        , Infix (resOp "|" >> return (BinExpr BitWiseOr)) AssocLeft
-        , Infix (resOp "+" >> return (BinExpr Addition)) AssocLeft
-        , Infix (resOp "-" >> return (BinExpr Subtraction)) AssocLeft
-        , Infix (resOp "*" >> return (BinExpr Multiplication)) AssocLeft
-        , Infix (resOp "/" >> return (BinExpr Division)) AssocLeft
-        , Infix (resOp "%" >> return (BinExpr Modulo)) AssocLeft
-        , Infix (resOp ">>" >> return (BinExpr RightShift)) AssocLeft
-        , Infix (resOp "<<" >> return (BinExpr LeftShift)) AssocLeft
-        ]]
+callExpr :: Parser Expr
+callExpr = do
+  dbg "In: callExpr"
+  name <- ident <?> "Failed to get identifier of call expression"
+  spacex
+  elist <- try exprList <|> try exprListEmpty
+  return $ Call name elist
 
 term1 = do
   dbg "term1"
-  choice [ try $ parens lexer expr
-         , try curInstExpr
-         , try callExpr
-         , try identExpr
-         , try numExpr
-         , try charExpr
-         ]
-    
+  choice $ [ try numExpr
+           , try identExpr
+           , try charExpr
+           , try callExpr
+           ]
 term2 = do
   dbg "term2"
+  char '('
   spacex
-  t <- term1
+  e <- expr
   spacex
-  return t
+  char ')'
+  return e
 
-expr :: Parser Expr
-expr = do
-  dbg "expr"
-  buildExpressionParser ops term2
+term = choice [ binExpr
+              , try term2
+              , try term1
+              ] 
+
+binExpr1 = do
+  e1 <- term
+  spacex
+  b <- binop
+  spacex
+  e2 <- term
+  return $ BinExpr b e1 e2
+
+binExpr2 = do
+  dbg "binExpr2"
+  char '('
+  spacex
+  e <- binExpr1
+  spacex
+  char ')'
+  return e
+
+
+binExpr = binExpr1 <|> binExpr2
+
+expr = term <|> binExpr
+ 
+    
+
+
+
+
+{-
+
+------------------------------------------------------------------
+
+-- expr = buildExpressionParser table term2
+-- binary name fun assoc = Infix (do{ string name; return fun }) assoc
+-- prefix name fun = Prefix (do { string name ; return fun })
+
+-- -- term = parens expr 
+
+-- table = [ [prefix "-" Neg]
+--         , [ binary "*" (BinExpr Multiplication) AssocLeft
+--           , binary "*" (BinExpr Multiplication) AssocLeft
+--           , binary "/" (BinExpr Division ) AssocLeft
+--           , binary "+" (BinExpr Addition ) AssocLeft
+--           , binary "-" (BinExpr Subtraction ) AssocLeft
+--           , binary "~" (BinExpr BitwiseComplement) AssocLeft
+--           , binary "&" (BinExpr BitWiseAnd) AssocLeft
+--           , binary "|" (BinExpr BitWiseOr) AssocLeft
+--           , binary "+" (BinExpr Addition) AssocLeft
+--           , binary "-" (BinExpr Subtraction) AssocLeft
+--           , binary "*" (BinExpr Multiplication) AssocLeft
+--           , binary "/" (BinExpr Division) AssocLeft
+--           , binary "%" (BinExpr Modulo) AssocLeft
+--           , binary ">>" (BinExpr RightShift) AssocLeft
+--           , binary "<<" (BinExpr LeftShift) AssocLeft
+--           ]]
+
+
+-- lexer :: GenTokenParser String u Data.Functor.Identity.Identity
+-- lexer = (Token.makeTokenParser languageDef){whiteSpace = spacex}
+
+-- resOp = Token.reservedOp lexer
+
+-- ops = [ [ Prefix (resOp "-" >> return (Neg))]
+--       , [ Infix (resOp "*" >> return (BinExpr Multiplication)) AssocLeft
+--         , Infix (resOp "/" >> return (BinExpr Division )) AssocLeft
+--         , Infix (resOp "+" >> return (BinExpr Addition )) AssocLeft
+--         , Infix (resOp "-" >> return (BinExpr Subtraction )) AssocLeft
+--         , Infix (resOp "~" >> return (BinExpr BitwiseComplement)) AssocLeft
+--         , Infix (resOp "&" >> return (BinExpr BitWiseAnd)) AssocLeft
+--         , Infix (resOp "|" >> return (BinExpr BitWiseOr)) AssocLeft
+--         , Infix (resOp "+" >> return (BinExpr Addition)) AssocLeft
+--         , Infix (resOp "-" >> return (BinExpr Subtraction)) AssocLeft
+--         , Infix (resOp "*" >> return (BinExpr Multiplication)) AssocLeft
+--         , Infix (resOp "/" >> return (BinExpr Division)) AssocLeft
+--         , Infix (resOp "%" >> return (BinExpr Modulo)) AssocLeft
+--         , Infix (resOp ">>" >> return (BinExpr RightShift)) AssocLeft
+--         , Infix (resOp "<<" >> return (BinExpr LeftShift)) AssocLeft
+--         ]]
+
+-- expr :: Parser Expr
+-- expr = do
+--   dbg "expr"
+--   buildExpressionParser ops term2
 
 ------------------------------------------------------------------
 data Macro = MacroLine Ident ArgList [Stmt]
@@ -370,38 +419,6 @@ identStmt = do
   dbg "identStmt"
   ident >>= (return . IdentStmt)
 
-exprListEmpty :: Parser [Expr]
-exprListEmpty = do
-  dbg "exprListEmpty"
-  char '('
-  spacex
-  char ')'
-  return []
-
-exprList :: Parser [Expr]
-exprList = do
-  dbg "exprList"
-  char '('
-  spacex
-  fst <- expr
-  rest <- many $ do spacex
-                    char ','
-                    spacex
-                    expr
-  spacex
-  char ')'
-  return (fst:rest)
-             
-
-
-callExpr :: Parser Expr
-callExpr = do
-  dbg "In: callExpr"
-  name <- ident <?> "Failed to get identifier of call expression"
-  spacex
-  elist <- try exprList <|> try exprListEmpty
-  return $ Call name elist
-
 ------------------------------------------------------------------
 data Proc = Include String
           | Align (Maybe Expr)
@@ -474,3 +491,4 @@ topLevels = do
 topLevel = many $ topLevels
 
 -- ".macro extract_field1 (RA, M, N, RB) { a = 10 \n b = 30 \n SHLC(RA, 31-M, RB) \n }"
+-}
