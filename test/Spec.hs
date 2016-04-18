@@ -1,4 +1,3 @@
-{-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE MonomorphismRestriction #-}
 {-# LANGUAGE FlexibleContexts #-}
 import Lib
@@ -15,6 +14,12 @@ main = do putStrLn "--------------------------------------------"
           testIdent
           testIdentSepComma
           testExpr
+          -- testQuotedString
+          -- testCall
+          -- testAssn
+          -- testStmt
+          -- testMacro
+          putStrLn "Success"
           
 assertParse :: (Eq a, Show a) => TP.Parsec [Char] () a -> [Char] -> a -> IO ()
 assertParse rule str val = do
@@ -24,6 +29,16 @@ assertParse rule str val = do
                  then return ()
                  else error (show v)
     (Left msg) -> error (show msg)
+
+
+
+justParse :: (Eq a, Show a) => TP.Parsec [Char] () a -> [Char] -> IO ()
+justParse rule str = do
+  let result = TP.parse rule "" str
+  case result of
+    (Right v) -> return ()
+    (Left msg) -> error $ (show msg) ++ "\n\n" ++ (show str)
+
 
 testLitNums = do
   assertParse litNum "42" (LitNum 42)
@@ -55,6 +70,8 @@ testIdentList = do
 
 testExpr = do
   let f = assertParse expr2
+  let j = justParse expr2
+  
   f ("1 + 2") (ExprTermExpr (TermLitNum (LitNum 1))
                [ExprBinTail Addition (TermLitNum (LitNum 2))])
 
@@ -65,29 +82,88 @@ testExpr = do
   f ("a+b+c") abc
   f ("-a") (ExprNeg (ExprTermExpr (TermIdent (Ident "a")) []))
 
-
+  let (Right val1) = TP.parse expr2 "" "((a+b+c))"
+  f "((a+b+c))" val1
+  f "( (a+b+c))" val1
+  f "(( a+b+c))" val1
+  f "( (a+b+  c) )" val1
+  f "(( a+ b+c))" val1
+  f "(   (   a + b + c )  )" val1
+  
+  j "-----a+ --1"
+  j "-(-(--a+-1))"
+  
+{-
 testQuotedString = do
   let f = assertParse quotedString
+  let j = justParse quotedString
   f "\"asdf\"" "asdf"
 
-  -- f ("((a+b+c))") abc
-  -- parseTest("ExprList", "(1, 1, 1)")    
+testAssn = do
+  let j = justParse assn
+      f = assertParse assn
+      result1 = (Assn
+                 (Ident "a")
+                 (ExprTermExpr (TermLitNum (LitNum 23)) []))
 
-{-
-    
+  f "a = 23" result1
+  f "a=23" result1
+  f "a= 23" result1
+  f "a =23" result1
+  
+  j ". = 23"
+  j ". = 23 << 1"
+  j ". = 1+(-0x23 << --0b01)"
+
+testCall = do
+  let f = assertParse call
+  let j = justParse call
+  f "foo(a,b)" $ (Call (Ident "foo")
+                  [ ExprTermExpr (TermIdent (Ident "a")) []
+                  , ExprTermExpr (TermIdent (Ident "b")) []])
+
+  f "foo()" $ (Call (Ident "foo") [])
+  f "foo(1,2)" $ (Call (Ident "foo")
+                  [ ExprTermExpr (TermLitNum (LitNum 1)) []
+                  , ExprTermExpr (TermLitNum (LitNum 2)) []])
+
+
+testMacro = do
+  let f = assertParse macro
+      mac1 = (Macro (Ident "Add")
+              [Ident "A",Ident "B"]
+              [StmtExpr
+               (ExprTermExpr
+                (TermIdent (Ident "A"))
+                [ExprBinTail Addition (TermIdent (Ident "B"))])])
+  
+  f (".macro Add(A,B} {A+B}") mac1
+  f (".macro Add(A,B} {A+B }") mac1
+
+
+
+  
+testStmt = do
+  let f = assertParse quotedString
+      j = justParse stmt
+      betaopc = Ident "betaopc"
+      num = LitNum 0x1B
+      ra = Ident "RA"
+  
+  -- f "betaopc(0x1B,RA)" (Call betaopc [Expr )
+  -- j "a=10 b=20 a b c"
+  -- j "a=10 \n b=20 \n c=30 \n"
+  j "A"
+  -- j ". . . ."
+  j "betaopc(0x1B,RA,0,RC)"
+  -- j "a=10 \n b=20 \n c=30 \n"
+  j "A"
+  j "a+b"
+  j "a=101@#!@#"
+-}
+  
+{-    
 ------------------------------------------------------------------    
-def testAstBinopStar():
-    parseTest("Binop", "*")
-def testAstBinopPlus():
-    parseTest("Binop", "+")
-def testAst_binop_fslash():
-    parseTest("Binop", "/")   
-def testAst_binop_minux():
-    parseTest("Binop", "-")    
-def testAstBinopLeftShift():
-    parseTest("Binop", "<<")    
-def testAstBinopRightShift():
-    parseTest("Binop", ">>")
     
 def testStmt1():
     parseTest("Stmt", "a = 23")
@@ -97,14 +173,6 @@ def testStmt3():
     parseTest("Stmt", ". = 23 << 1") 
 def testStmt4():
     parseTest("Stmt", ". = 1+(-0x23 << --0b01)")
-def testStmt5():
-    parseTest("Stmt", "betaopc(0x1B,RA,0,RC)")   
-def testStmt6():
-    parseTest("Stmts", "a=10 b=20 a b c")
-def testStmt7():
-    parseTest("Stmts", "a=10 \n b=20 \n c=30 \n")
-def testStmt8():
-    parseTest("Stmts", "A")
 def testStmt9():
     parseTest("Stmts", ". . . .")
 

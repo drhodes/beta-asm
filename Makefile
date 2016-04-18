@@ -3,9 +3,7 @@ build: ## build
 	echo stack build
 
 test: FORCE ## test
-	@sleep 1
 	stack test
-	@sleep 2
 
 clean: ## clean all the things
 	sh clean.sh
