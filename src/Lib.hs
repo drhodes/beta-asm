@@ -1,7 +1,6 @@
 {-# LANGUAGE MonomorphismRestriction #-}
 {-# LANGUAGE FlexibleContexts #-}
 
-
 module Lib where
 
 import           Data.Functor.Identity
@@ -227,7 +226,6 @@ term4 = do
   spacex
   return $ TermExpr e
 
-{-
 data Proc = DotInclude String
           | DotAlign Expr
           | DotAscii String
@@ -347,12 +345,13 @@ macroBody = do
 macroBody1 :: Parser [Stmt]  
 macroBody1 = do
   dbg "macroBody"
+  spacex
   stmts <- many (do spacex
                     s <- stmt
                     spacex
                     return s)
   spacex
-  char '\n'
+  endOfLine
   return stmts
   
 macroBody2 = do
@@ -385,4 +384,3 @@ topLevel2 = do spaces
                return (TopMacro m)
 
 sourceFile = many topLevel
--}

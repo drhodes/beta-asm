@@ -14,11 +14,11 @@ main = do putStrLn "--------------------------------------------"
           testIdent
           testIdentSepComma
           testExpr
-          -- testQuotedString
-          -- testCall
-          -- testAssn
-          -- testStmt
-          -- testMacro
+          testQuotedString
+          testCall
+          testAssn
+          testStmt
+          testMacro
           putStrLn "Success"
           
 assertParse :: (Eq a, Show a) => TP.Parsec [Char] () a -> [Char] -> a -> IO ()
@@ -27,7 +27,9 @@ assertParse rule str val = do
   case result of
     (Right v) -> if v == val
                  then return ()
-                 else error (show v)
+                 else do print ("Expected: ", val)
+                         print ("Parsed  : ", v)
+                         error (show v)
     (Left msg) -> error (show msg)
 
 
@@ -82,22 +84,26 @@ testExpr = do
   f ("a+b+c") abc
   f ("-a") (ExprNeg (ExprTermExpr (TermIdent (Ident "a")) []))
 
-  let (Right val1) = TP.parse expr2 "" "((a+b+c))"
-  f "((a+b+c))" val1
-  f "( (a+b+c))" val1
-  f "(( a+b+c))" val1
-  f "( (a+b+  c) )" val1
-  f "(( a+ b+c))" val1
-  f "(   (   a + b + c )  )" val1
-  
+  -- let (Right val1) =
+  case TP.parse expr2 "" "((a+b+c))" of
+    (Right val1) -> do f "((a+b+c))" val1
+                       f "( (a+b+c))" val1
+                       f "(( a+b+c))" val1
+                       f "( (a+b+  c) )" val1
+                       f "(( a+ b+c))" val1
+                       f "(   (   a + b + c )  )" val1
+                       f "((a + b + c)  )" val1
+                       f "(  ( a+b + c)  )" val1
+    (Left msg) -> error (show msg)
+    
   j "-----a+ --1"
   j "-(-(--a+-1))"
   
-{-
 testQuotedString = do
   let f = assertParse quotedString
   let j = justParse quotedString
   f "\"asdf\"" "asdf"
+  f "\" hello \"" " hello "
 
 testAssn = do
   let j = justParse assn
@@ -137,31 +143,38 @@ testMacro = do
                 (TermIdent (Ident "A"))
                 [ExprBinTail Addition (TermIdent (Ident "B"))])])
   
-  f (".macro Add(A,B} {A+B}") mac1
-  f (".macro Add(A,B} {A+B }") mac1
-
-
+  f (".macro Add(A,B) A+B\n") mac1
+  f (".macro Add(A,B) A+B \n") mac1
+  f (".macro Add(A,B) { A + B }") mac1
+  f (".macro Add(A,B) {\n A + B\n } ") mac1
+  f (".macro Add(A,B) { A + B\n } ") mac1
 
   
 testStmt = do
-  let f = assertParse quotedString
+  let f = assertParse stmt
       j = justParse stmt
       betaopc = Ident "betaopc"
       num = LitNum 0x1B
       ra = Ident "RA"
+      result1 = (StmtCall
+                 (Call (Ident "betaopc")
+                  [ ExprTermExpr (TermLitNum (LitNum 27)) []
+                  , ExprTermExpr (TermIdent (Ident "RA")) []
+                  , ExprTermExpr (TermLitNum (LitNum 0)) []
+                  , ExprTermExpr (TermIdent (Ident "RC")) []]))
   
   -- f "betaopc(0x1B,RA)" (Call betaopc [Expr )
   -- j "a=10 b=20 a b c"
   -- j "a=10 \n b=20 \n c=30 \n"
   j "A"
   -- j ". . . ."
-  j "betaopc(0x1B,RA,0,RC)"
+  f "betaopc(0x1B,RA,0,RC)" result1
   -- j "a=10 \n b=20 \n c=30 \n"
   j "A"
   j "a+b"
   j "a=101@#!@#"
--}
-  
+
+
 {-    
 ------------------------------------------------------------------    
     
