@@ -1,11 +1,11 @@
 {-# LANGUAGE MonomorphismRestriction #-}
 {-# LANGUAGE FlexibleContexts #-}
-import Uasm.Parser
-
+import           Uasm.Parser
+import           Uasm.Types
 import qualified Text.Parsec as TP
-import Text.Parsec.Error
-import Text.Parsec.String
-import Control.Monad
+import           Text.Parsec.Error
+import           Text.Parsec.String
+import           Control.Monad
 
 main :: IO ()
 main = do putStrLn "--------------------------------------------"
@@ -169,7 +169,7 @@ testStmt = do
   j "A"
   j "a+b"
   j "a=101@#!@#"
-
+  f "." (StmtExpr (ExprTermExpr (TermIdent CurInstruction) []))
 
 {-    
 ------------------------------------------------------------------    

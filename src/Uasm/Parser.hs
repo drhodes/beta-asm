@@ -12,6 +12,8 @@ import           Text.ParserCombinators.Parsec.Language
 import           Text.ParserCombinators.Parsec.Token
 import qualified Text.ParserCombinators.Parsec.Token as Token
 
+import           Uasm.Types
+
 spacex = do many (char ' ' <|> char '\t')
             return ()
 
@@ -24,9 +26,6 @@ dbg s = if debug
         else return ()
 
 ------------------------------------------------------------------
-data Ident = Ident String
-           | CurInstruction
-             deriving (Show, Eq)
                     
 ident1 :: Parser Ident
 ident1 = do
@@ -45,7 +44,6 @@ ident = do
   dbg "ident"
   choice [ try ident1
          , try ident3]
-
 
 ruleSepComma rule = do
   dbg "ruleSepComma'"
@@ -93,37 +91,12 @@ decNum = do
   return (read d :: Integer)
 
 ------------------------------------------------------------------
-data LitNum = LitNum Integer deriving (Show, Eq)
 
 litNum :: Parser LitNum
 litNum = do
   dbg "litNum"
   n <- choice [try binNum, try hexNum, try decNum]
   return $ LitNum n
-
-data Binop = BitwiseComplement
-           | BitwiseAnd
-           | BitwiseOr
-           | Addition
-           | Subtract
-           | Multiply
-           | Division
-           | Modulo
-           | RightShift
-           | LeftShift
-             deriving (Show, Eq)
-
-data Expr = ExprNeg Expr
-          | ExprTerm Term
-          | ExprTermExpr Term [Expr]
-          | ExprBinTail Binop Term
-            deriving (Show, Eq)
-                     
-data Term = TermIdent Ident
-          | TermLitNum LitNum
-          | TermNeg Term
-          | TermExpr Expr
-            deriving (Show, Eq)
                      
 expr2 = do
   dbg "expr2"
@@ -225,17 +198,7 @@ term4 = do
   e <- parened expr2
   spacex
   return $ TermExpr e
-
-data Proc = DotInclude String
-          | DotAlign Expr
-          | DotAscii String
-          | DotText String
-          | DotBreakPoint
-          | DotProtect
-          | DotUnprotect
-          | DotOptions
-          | Label String
-            deriving (Show, Eq)
+  
 ------------------------------------------------------------------
 
 proc = do choice [ try $ do string ".include"
@@ -282,11 +245,6 @@ quotedString = do
 
     
 ------------------------------------------------------------------
-data Stmt = StmtProc Proc
-          | StmtCall Call
-          | StmtAssn Assn
-          | StmtExpr Expr
-            deriving (Show, Eq)
 
 stmt :: Parser Stmt
 stmt = choice [ try stmt1 
@@ -301,7 +259,6 @@ stmt3 = assn >>= return . StmtAssn
 stmt4 = expr2 >>= return . StmtExpr
 
 ------------------------------------------------------------------
-data Assn = Assn Ident Expr deriving (Show, Eq)
 
 assn :: Parser Assn
 assn = do
@@ -314,15 +271,12 @@ assn = do
   return $ Assn lhs x
 
 ------------------------------------------------------------------
-data Call = Call Ident [Expr] deriving (Show, Eq)
 
 call :: Parser Call
 call = do name <- ident
           spacex
           list <- exprList
           return $ Call name list
-
-data Macro = Macro Ident [Ident] [Stmt] deriving (Show, Eq)
 
 macro = do
   dbg "macro"
@@ -367,9 +321,6 @@ macroBody2 = do
   return stmts
 
 ------------------------------------------------------------------
-data TopLevel = TopStmt Stmt
-              | TopMacro Macro
-                deriving (Show, Eq)
 
 topLevel = try topLevel2 <|> try topLevel1
 
