@@ -1,6 +1,6 @@
 module Main where
 
-import Lib
+import Uasm.Parser
 
 main :: IO ()
 main = print "hi"

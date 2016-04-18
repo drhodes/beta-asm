@@ -1,7 +1,4 @@
-{-# LANGUAGE MonomorphismRestriction #-}
-{-# LANGUAGE FlexibleContexts #-}
-
-module Lib where
+module Uasm.Parser where
 
 import           Data.Functor.Identity
 import           Debug.Trace
@@ -105,8 +102,8 @@ litNum = do
   return $ LitNum n
 
 data Binop = BitwiseComplement
-           | BitWiseAnd
-           | BitWiseOr
+           | BitwiseAnd
+           | BitwiseOr
            | Addition
            | Subtract
            | Multiply
@@ -175,6 +172,9 @@ binop = choice [ try (op "*" Multiply)
                , try (op ">>" RightShift)
                , try (op "<<" LeftShift)
                , try (op "%" Modulo)
+               , try (op "~" BitwiseComplement)
+               , try (op "&" BitwiseAnd)
+               , try (op "|" BitwiseOr)
                ]
 
 expr1 = many $ do spacex
@@ -279,8 +279,9 @@ quotedString = do
     strings <- many character
     char '"'
     return $ concat strings
-------------------------------------------------------------------
 
+    
+------------------------------------------------------------------
 data Stmt = StmtProc Proc
           | StmtCall Call
           | StmtAssn Assn
@@ -298,7 +299,6 @@ stmt1 = proc >>= return . StmtProc
 stmt2 = call >>= return . StmtCall
 stmt3 = assn >>= return . StmtAssn
 stmt4 = expr2 >>= return . StmtExpr
-
 
 ------------------------------------------------------------------
 data Assn = Assn Ident Expr deriving (Show, Eq)

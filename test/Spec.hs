@@ -1,6 +1,6 @@
 {-# LANGUAGE MonomorphismRestriction #-}
 {-# LANGUAGE FlexibleContexts #-}
-import Lib
+import Uasm.Parser
 
 import qualified Text.Parsec as TP
 import Text.Parsec.Error
@@ -32,15 +32,12 @@ assertParse rule str val = do
                          error (show v)
     (Left msg) -> error (show msg)
 
-
-
 justParse :: (Eq a, Show a) => TP.Parsec [Char] () a -> [Char] -> IO ()
 justParse rule str = do
   let result = TP.parse rule "" str
   case result of
     (Right v) -> return ()
     (Left msg) -> error $ (show msg) ++ "\n\n" ++ (show str)
-
 
 testLitNums = do
   assertParse litNum "42" (LitNum 42)
@@ -84,7 +81,6 @@ testExpr = do
   f ("a+b+c") abc
   f ("-a") (ExprNeg (ExprTermExpr (TermIdent (Ident "a")) []))
 
-  -- let (Right val1) =
   case TP.parse expr2 "" "((a+b+c))" of
     (Right val1) -> do f "((a+b+c))" val1
                        f "( (a+b+c))" val1
