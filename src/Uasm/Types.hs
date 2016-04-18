@@ -2,10 +2,19 @@ module Uasm.Types where
 
 import qualified Data.Map as DM
 
-data SymbolTable = SymTab (DM.Map Ident Value)
+data SymbolTable = SymTab { symTabCurScope :: DM.Map SymbolKey Value
+                          , symTabNextScope :: SymbolTable }
+                 | NullTable
+                 deriving (Show, Eq)
+                          
+data SymbolKey = KeyMacro Ident Int
+               | KeyIdent Ident
+                 deriving (Show, Eq, Ord)
 
 data Value = ValNum Integer
+           | ValMacro Macro
            | ValIdent Ident
+           | ValExpr Expr
            | NegVal Value
            | Delayed Binop Value Value
              deriving (Show, Eq)
@@ -66,7 +75,7 @@ data Term = TermIdent Ident
 
 data Ident = Ident String
            | CurInstruction
-             deriving (Show, Eq)
+             deriving (Show, Eq, Ord)
 
 data LitNum = LitNum Integer deriving (Show, Eq)
 
