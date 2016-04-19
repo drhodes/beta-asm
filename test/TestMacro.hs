@@ -11,11 +11,16 @@ import           Text.Parsec.Error
 import           Text.Parsec.String
 import           Control.Monad
 
-testAll = do
-  testSomething1
-  testSomething2
-  -- testSomething3
-  -- testSomething4
+import Test.Tasty
+import Test.Tasty.HUnit
+
+unitTests = testGroup "Unit tests"
+
+testAll = testGroup "Macro Tests"
+  [ testCase "testSomething1" $ testSomething1
+  , testCase "testSomething2" $ testSomething2
+  , testCase "testSomething4" $ testSomething4
+  ] 
 
 testSomething1 :: IO ()
 testSomething1 = do
@@ -35,6 +40,8 @@ testSomething4 = do
                     ]
   testMacro prog [ValNum 3]
 
+
+testMacro :: String -> [Value] -> IO ()
 testMacro prog val = do  
   case TP.parse (TP.many topLevel) "" prog of
     (Right ast) ->

@@ -8,25 +8,60 @@ import           Text.Parsec.Error
 import           Text.Parsec.String
 import           Control.Monad
 
-main :: IO ()
-main = do putStrLn "--------------------------------------------"
-          putStrLn "Testing parser..."
-          
-          testFile "beta.uasm"
-          
-          testLitNums
-          testIdent
-          testIdentSepComma
-          testExpr
-          testQuotedString
+import           Test.Tasty
+import           Test.Tasty.HUnit
+import           Test.Tasty.QuickCheck as QC
+import           Test.Tasty.SmallCheck as SC
 
-          testCall
-          testAssn
-          testStmt
-          testMacro
-          TM.testAll
-          putStrLn "Success"
-          
+import           Data.List
+import           Data.Ord
+
+main = defaultMain tests
+
+tests :: TestTree
+-- tests = testGroup "Tests" [properties, unitTests]
+tests = testGroup "Tests" [unitTests, TM.testAll]
+
+-- properties :: TestTree
+-- properties = testGroup "Properties" [scProps, qcProps]
+
+-- scProps = testGroup "(checked by SmallCheck)"
+--   [ SC.testProperty "sort == sort . reverse" $
+--       \list -> sort (list :: [Int]) == sort (reverse list)
+--   , SC.testProperty "Fermat's little theorem" $
+--       \x -> ((x :: Integer)^7 - x) `mod` 7 == 0
+--   -- the following property does not hold
+--   , SC.testProperty "Fermat's last theorem" $
+--       \x y z n ->
+--         (n :: Integer) >= 3 SC.==> x^n + y^n /= (z^n :: Integer)
+--   ]
+
+-- qcProps = testGroup "(checked by QuickCheck)"
+--   [ QC.testProperty "sort == sort . reverse" $
+--       \list -> sort (list :: [Int]) == sort (reverse list)
+--   , QC.testProperty "Fermat's little theorem" $
+--       \x -> ((x :: Integer)^7 - x) `mod` 7 == 0
+--   -- the following property does not hold
+--   , QC.testProperty "Fermat's last theorem" $
+--       \x y z n ->
+--         (n :: Integer) >= 3 QC.==> x^n + y^n /= (z^n :: Integer)
+--   ]
+
+unitTests = testGroup "Parse tests"
+  [ testCase "Idents parse" $ testIdent
+  , testCase "testFile" $ testFile "beta.uasm"
+  , testCase "testLitNums" $ testLitNums 
+  , testCase "testIdent" $ testIdent 
+  , testCase "testIdentSepComma" $ testIdentSepComma 
+  , testCase "testExpr" $ testExpr 
+  , testCase "testQuotedString" $ testQuotedString 
+  , testCase "testCall" $ testCall 
+  , testCase "testAssn" $ testAssn 
+  , testCase "testStmt" $ testStmt 
+  , testCase "testMacro" $ testMacro 
+    
+  ] 
+
 assertParse :: (Eq a, Show a) => TP.Parsec [Char] () a -> [Char] -> a -> IO ()
 assertParse rule str val = do
   let result = TP.parse rule "" str
@@ -222,9 +257,8 @@ eraseComments src =
    (eraseBlockComment src False) False)
   
 
+{-
 
-
-{-    
 ------------------------------------------------------------------    
     
 def testMacro0():

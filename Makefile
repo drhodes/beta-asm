@@ -3,9 +3,9 @@ build: ## build
 	echo stack build
 
 test: FORCE ## test
-	stack test
+	stack test +RTS -N -RTS
 
-clean: ## clean all the things
+clean: FORCE ## clean all the things
 	sh clean.sh
 
 work: ## open all files in editor
