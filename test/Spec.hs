@@ -3,6 +3,7 @@
 import           Uasm.Parser
 import           Uasm.Types
 import qualified Text.Parsec as TP
+import qualified TestMacro as TM
 import           Text.Parsec.Error
 import           Text.Parsec.String
 import           Control.Monad
@@ -10,15 +11,20 @@ import           Control.Monad
 main :: IO ()
 main = do putStrLn "--------------------------------------------"
           putStrLn "Testing parser..."
+          
+          testFile "beta.uasm"
+          
           testLitNums
           testIdent
           testIdentSepComma
           testExpr
           testQuotedString
+
           testCall
           testAssn
           testStmt
           testMacro
+          TM.testAll
           putStrLn "Success"
           
 assertParse :: (Eq a, Show a) => TP.Parsec [Char] () a -> [Char] -> a -> IO ()
@@ -34,7 +40,7 @@ assertParse rule str val = do
 
 justParse :: (Eq a, Show a) => TP.Parsec [Char] () a -> [Char] -> IO ()
 justParse rule str = do
-  let result = TP.parse rule "" str
+  let result = TP.parse (rule <* TP.eof) "" str
   case result of
     (Right v) -> return ()
     (Left msg) -> error $ (show msg) ++ "\n\n" ++ (show str)
@@ -55,9 +61,11 @@ testIdent = do
   
 testIdentSepComma = do
   let f = assertParse identSepComma
+      abc = [Ident "a", Ident "b", Ident "c"]
+  
   f "a, ." [Ident "a", CurInstruction]
-  f "a, b, c" $ map (Ident . (:[])) "abc"
-  f "a,b,  c" $ map (Ident . (:[])) "abc"
+  f "a, b, c" $ abc
+  f "a,b,  c" $ abc
 
 testIdentList = do
   let x = Ident "x"
@@ -94,12 +102,15 @@ testExpr = do
     
   j "-----a+ --1"
   j "-(-(--a+-1))"
+
+quote s = "\"" ++ s ++ "\""
   
 testQuotedString = do
   let f = assertParse quotedString
   let j = justParse quotedString
-  f "\"asdf\"" "asdf"
-  f "\" hello \"" " hello "
+  f (quote "asdf") "asdf"
+  f (quote " hello ") " hello "
+  j (quote "   asdf asdf asdf asdf \\t ")
 
 testAssn = do
   let j = justParse assn
@@ -112,7 +123,6 @@ testAssn = do
   f "a=23" result1
   f "a= 23" result1
   f "a =23" result1
-  
   j ". = 23"
   j ". = 23 << 1"
   j ". = 1+(-0x23 << --0b01)"
@@ -129,6 +139,11 @@ testCall = do
                   [ ExprTermExpr (TermLitNum (LitNum 1)) []
                   , ExprTermExpr (TermLitNum (LitNum 2)) []])
 
+  j "Hello(asdf,  123)"
+  j "A_(1,2,3,4,-0x123)"
+  j "Asdf()"
+
+
 
 testMacro = do
   let f = assertParse macro
@@ -144,7 +159,6 @@ testMacro = do
   f (".macro Add(A,B) { A + B }") mac1
   f (".macro Add(A,B) {\n A + B\n } ") mac1
   f (".macro Add(A,B) { A + B\n } ") mac1
-
   
 testStmt = do
   let f = assertParse stmt
@@ -168,23 +182,50 @@ testStmt = do
   -- j "a=10 \n b=20 \n c=30 \n"
   j "A"
   j "a+b"
-  j "a=101@#!@#"
   f "." (StmtExpr (ExprTermExpr (TermIdent CurInstruction) []))
+  j "a = 23"
+  j ". = 23"
+  j ". = 23 << 1"
+  j ". = 1+(-0x23 << --0b01)"
+
+
+testFile file = setupTest (TP.many topLevel) file
+
+
+setupTest parser file = do
+  txt <- readFile $ "./test/uasm/" ++ file
+  let t = eraseComments txt
+  justParse parser t
+  
+eraseLineComment [] _ = []
+eraseLineComment src@(c:str) inComment =
+  if take 2 src == "//"
+  then "  " ++ (eraseLineComment (drop 2 src) True)
+  else if c == '\n'
+       then c:(eraseLineComment str False)
+       else if inComment
+            then ' ':(eraseLineComment str True)
+            else c:(eraseLineComment str False)
+
+eraseBlockComment [] _ = []
+eraseBlockComment src@(c:str) inComment =
+  if take 2 src == "/*" && not inComment
+  then "  " ++ (eraseBlockComment (drop 2 src) True)       
+  else if take 2 src == "*/" && inComment
+       then "  " ++ (eraseBlockComment (drop 2 src) False)
+       else if inComment               
+            then ' ':(eraseBlockComment str inComment)
+            else c:(eraseBlockComment str inComment)
+
+eraseComments src =
+  (eraseLineComment
+   (eraseBlockComment src False) False)
+  
+
+
 
 {-    
 ------------------------------------------------------------------    
-    
-def testStmt1():
-    parseTest("Stmt", "a = 23")
-def testStmt2():
-    parseTest("Stmt", ". = 23")
-def testStmt3():
-    parseTest("Stmt", ". = 23 << 1") 
-def testStmt4():
-    parseTest("Stmt", ". = 1+(-0x23 << --0b01)")
-def testStmt9():
-    parseTest("Stmts", ". . . .")
-
     
 def testMacro0():
     parseTest("Macro", ".macro CALL(label) BR(label, LP) //asdf \n")
@@ -230,7 +271,6 @@ def testMacro_20():
     parseTest("Macro", ".macro PUSH(RA) ADDC(SP,4,SP)  ST(RA,-4,SP)\n ")
 def testMacro_21():
     parseTest("Macro", ".macro POP(RA) LD(SP,-4,RA)   ADDC(SP,-4,SP)\n ")
-
 def testTopLevel_0():
     parseTest("Macro", ".macro A (RA, M, N, RB) {a = 10}") 
 def testTop_level_1():
@@ -272,13 +312,6 @@ def testParse_test_assn_5():
     parseTest("Assn", "VEC_RESET = 0")
 def testParse_test_assn_6():    
     parseTest("Assn", "VEC_II = 4")
-    
-def testParseTest_call_1():
-    parseTest("Call", "Hello(asdf,123)") 
-def testParse_test_call_2():
-    parseTest("Call", "A_(1,2,3,4,-0x123)")
-def testParse_test_call_3():
-    parseTest("Call", "Asdf()")
 
 def testParseTest_expr_1():    
     parseTest("Expr2", "1 + 2 + (3)")
@@ -326,41 +359,4 @@ def testParse_test_expr_20():
 -}
 
 
-{-
-go1 x y = setupTest x y >>= processResults
   
-processResults (file, result) = do
-  case result of
-    Left err -> putStrLn $ "Fail: " ++ file ++ "\n" ++ (show err)
-    Right msg -> putStrLn $ "Pass: " ++ file ++ ": " ++ (show msg)
-  
-setupTest parser file = do
-  txt <- readFile $ "./test/uasm/" ++ file
-  let t = eraseComments txt
-  let r = TP.parse parser file t
-  return (file, r)
-
-eraseLineComment [] _ = []
-eraseLineComment src@(c:str) inComment =
-  if take 2 src == "//"
-  then "  " ++ (eraseLineComment (drop 2 src) True)
-  else if c == '\n'
-       then c:(eraseLineComment str False)
-       else if inComment
-            then ' ':(eraseLineComment str True)
-            else c:(eraseLineComment str False)
-
-eraseBlockComment [] _ = []
-eraseBlockComment src@(c:str) inComment =
-  if take 2 src == "/*" && not inComment
-  then "  " ++ (eraseBlockComment (drop 2 src) True)       
-  else if take 2 src == "*/" && inComment
-       then "  " ++ (eraseBlockComment (drop 2 src) False)
-       else if inComment               
-            then ' ':(eraseBlockComment str inComment)
-            else c:(eraseBlockComment str inComment)
-
-eraseComments src =
-  (eraseLineComment
-   (eraseBlockComment src False) False)
--}

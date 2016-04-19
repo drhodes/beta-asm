@@ -1,5 +1,7 @@
 module Uasm.Eval where
 
+import qualified Uasm.SymbolTable as SymTab
+
 import Uasm.Parser
 import Uasm.Types
 
@@ -18,21 +20,22 @@ opVal bop (ValNum x) (ValNum y) = ValNum (opApply bop x y)
 opVal bop x y = Delayed bop x y
 
 instance Eval Expr where  
-  eval (ExprNeg expr) = negateVal (eval expr)
-  eval (ExprTerm term) = eval term
-  eval (ExprTermExpr term exprs) =
+  eval (ExprNeg expr) st = negateVal (eval expr st)
+  eval (ExprTerm term) st = eval term st
+  eval (ExprTermExpr term exprs) st =
     if null exprs
-    then eval term
+    then eval term st
     else case exprs of
-      [ExprBinTail binop rest] -> opVal binop (eval term) (eval rest)
+      [ExprBinTail binop rest] -> opVal binop (eval term st) (eval rest st)
       _ -> error "Unhandled Eval expr"
-      -- let msg = "(term, exprs): " ++ show (term, exprs)
-      --    in error $ "eval (ExprTermExpr term exprs), " ++ msg
-  eval (ExprBinTail binop term) = error "eval (ExprBinTail binop term)"
+  eval (ExprBinTail binop term) st = error "eval (ExprBinTail binop term)"
 
 instance Eval Term where
-  eval (TermIdent ident) = ValIdent ident
-  eval (TermLitNum (LitNum n)) = ValNum n
-  eval (TermNeg term) = negateVal (eval term)
-  eval (TermExpr expr) = eval expr
+  eval (TermIdent ident) st =
+    case SymTab.lookup (KeyIdent ident) st of
+      Just val -> val
+      Nothing -> error $ "Can't find identifier: " ++ show ident ++ (show st)
+  eval (TermLitNum (LitNum n)) st = ValNum n
+  eval (TermNeg term) st = negateVal (eval term st)
+  eval (TermExpr expr) st = eval expr st
 

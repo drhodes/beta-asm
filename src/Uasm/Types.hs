@@ -6,6 +6,11 @@ data SymbolTable = SymTab { symTabCurScope :: DM.Map SymbolKey Value
                           , symTabNextScope :: SymbolTable }
                  | NullTable
                  deriving (Show, Eq)
+
+-- instance Show SymbolTable where
+--   show NullTable = "<Null SymbolTable>"
+--   show (SymTab cur next) = 
+
                           
 data SymbolKey = KeyMacro Ident Int
                | KeyIdent Ident
@@ -15,12 +20,13 @@ data Value = ValNum Integer
            | ValMacro Macro
            | ValIdent Ident
            | ValExpr Expr
+           | ValProc Proc
            | NegVal Value
            | Delayed Binop Value Value
              deriving (Show, Eq)
 
 class Eval a where
-  eval :: a -> Value
+  eval :: a -> SymbolTable -> Value
 
 data TopLevel = TopStmt Stmt
               | TopMacro Macro
@@ -46,7 +52,7 @@ data Proc = DotInclude String
           | DotProtect
           | DotUnprotect
           | DotOptions
-          | Label String
+          | Label Ident
             deriving (Show, Eq)
 
 data Binop = BitwiseComplement

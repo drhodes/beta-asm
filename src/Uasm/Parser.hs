@@ -20,13 +20,12 @@ spacex = do many (char ' ' <|> char '\t')
 keywordMacro :: Parser String
 keywordMacro = do string ".macro"
 
-debug = True
+debug = False
 dbg s = if debug
         then traceShowM s
         else return ()
 
 ------------------------------------------------------------------
-                    
 ident1 :: Parser Ident
 ident1 = do
   dbg "ident1"
@@ -216,6 +215,11 @@ proc = do choice [ try $ do string ".include"
                  , try $ string ".breakpoint" >> return DotBreakPoint
                  , try $ string ".protect" >> return DotProtect
                  , try $ string ".unprotect" >> return DotUnprotect
+                 , try $ do labelName <- ident
+                            spacex
+                            char ':'
+                            return $ Label labelName
+                            
                    -- still need to do OPTIONS
                    -- still need to do label.
                  ]
