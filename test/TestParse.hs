@@ -5,6 +5,7 @@ import           Uasm.Parser
 import           Uasm.Types
 import qualified Text.Parsec as TP
 import qualified TestExpand as TE
+import qualified TestFixDot as TFD
 import           Text.Parsec.Error
 import           Text.Parsec.String
 import           Control.Monad
@@ -23,6 +24,7 @@ tests :: TestTree
 tests = testGroup "Tests" [ parseTests
                           , TE.testAll
                           , TE.testLabels
+                          , TFD.assigns
                           ]
 
 parseTests = testGroup "Parse tests"
@@ -37,7 +39,6 @@ parseTests = testGroup "Parse tests"
   , testCase "testAssn" $ testAssn 
   , testCase "testStmt" $ testStmt 
   , testCase "testMacro" $ testMacro 
-    
   ] 
 
 assertParse :: (Eq a, Show a) => TP.Parsec [Char] () a -> [Char] -> a -> IO ()

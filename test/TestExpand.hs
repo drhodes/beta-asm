@@ -48,10 +48,8 @@ testLabels = testGroup "Label Tests"
     , ValProc $ Label $ Ident "myLabel2"
     , ValNum 1
     ]
-
       
   ] 
-
 
 testSomething1 :: IO ()
 testSomething1 = do

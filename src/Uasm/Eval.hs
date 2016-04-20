@@ -39,3 +39,17 @@ instance Eval Term where
   eval (TermNeg term) st = negateVal (eval term st)
   eval (TermExpr expr) st = eval expr st
 
+instance Eval Value where
+  eval (ValExpr x) st = eval x st
+  eval (Delayed bop v1 v2) st = opVal bop v1 v2
+  -- eval (ValIdent Ident)
+
+  eval x _ = x
+  -- eval (ValDotAssn v)
+  -- eval (NegVal v)
+  -- eval (ValNum Integer)
+  -- eval (ValMacro Macro)
+  -- eval (ValProc Proc) _ = 
+
+
+

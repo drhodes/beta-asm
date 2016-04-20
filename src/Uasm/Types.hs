@@ -21,6 +21,7 @@ data Value = ValNum Integer
            | ValIdent Ident
            | ValExpr Expr
            | ValProc Proc
+           | ValDotAssn Value
            | NegVal Value
            | Delayed Binop Value Value
              deriving (Show, Eq)

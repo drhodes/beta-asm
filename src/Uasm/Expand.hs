@@ -33,7 +33,9 @@ instance Expand Stmt where
 instance Expand Assn where
   expand (Assn ident expr) st = 
     let k = KeyIdent ident
-    in (Right [], SymTab.insert k (eval expr st) st)
+    in if ident == CurInstruction          
+       then (Right [ValDotAssn (eval expr st)], st)
+       else (Right [], SymTab.insert k (eval expr st) st)
 
 instance Expand Call where
   expand (Call ident exprs) st =
