@@ -1,9 +1,9 @@
 module Uasm.Eval where
 
+import           Control.Monad
+import           Uasm.Parser
 import qualified Uasm.SymbolTable as SymTab
-
-import Uasm.Parser
-import Uasm.Types
+import           Uasm.Types
 
 negateVal (ValNum n) = ValNum (-n)
 netateVal (ValIdent n) = NegVal (ValIdent n)
@@ -20,31 +20,33 @@ opVal bop (ValNum x) (ValNum y) = ValNum (opApply bop x y)
 opVal bop x y = Delayed bop x y
 
 instance Eval Expr where  
-  eval (ExprNeg expr) st = negateVal (eval expr st)
+  eval (ExprNeg expr) st = liftM negateVal (eval expr st)
   eval (ExprTerm term) st = eval term st
   eval (ExprTermExpr term exprs) st =
     if null exprs
     then eval term st
     else case exprs of
-      [ExprBinTail binop rest] -> opVal binop (eval term st) (eval rest st)
+      [ExprBinTail binop rest] -> do v1 <- (eval term st)
+                                     v2 <- (eval rest st)
+                                     return $ opVal binop v1 v2
       _ -> error "Unhandled Eval expr"
   eval (ExprBinTail binop term) st = error "eval (ExprBinTail binop term)"
 
 instance Eval Term where
   eval (TermIdent ident) st =
     case SymTab.lookup (KeyIdent ident) st of
-      Just val -> val
-      Nothing -> error $ "Can't find identifier: " ++ show ident ++ (show st)
-  eval (TermLitNum (LitNum n)) st = ValNum n
-  eval (TermNeg term) st = negateVal (eval term st)
+      Just val -> return val
+      Nothing -> fail $ "Can't find identifier: " ++ show ident ++ (show st)
+  eval (TermLitNum (LitNum n)) st = return $ ValNum n
+  eval (TermNeg term) st = liftM negateVal (eval term st)
   eval (TermExpr expr) st = eval expr st
 
 instance Eval Value where
   eval (ValExpr x) st = eval x st
-  eval (Delayed bop v1 v2) st = opVal bop v1 v2
+  eval (Delayed bop v1 v2) st = do return $ opVal bop v1 v2
   -- eval (ValIdent Ident)
 
-  eval x _ = x
+  eval x _ = Right x
   -- eval (ValDotAssn v)
   -- eval (NegVal v)
   -- eval (ValNum Integer)

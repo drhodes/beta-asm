@@ -16,9 +16,9 @@ import Test.Tasty.HUnit
 
 unitTests = testGroup "Unit tests"
 
-testAll = testGroup "Macro Tests"
+testAll = testGroup "TestExpand.hs"
   [ testCase "testSomething1" $ testSomething1
-  , testCase "testSomething2" $ testSomething2
+  -- , testCase "testSomething2" $ testSomething2
   , testCase "testDot1" $ testExpand "." [ValIdent CurInstruction]
     
   , testCase "testDot2" $ testExpand ". ." [ ValIdent CurInstruction
@@ -43,11 +43,11 @@ testLabels = testGroup "Label Tests"
     ]
 
     ------------------------------------------------------------------
-  , testCase "label3" $ testExpand "a=1 a+a myLabel2: a*a"
-    [ ValNum 2
-    , ValProc $ Label $ Ident "myLabel2"
-    , ValNum 1
-    ]
+  -- , testCase "label3" $ testExpand "a=1 a+a myLabel2: a*a"
+  --   [ ValNum 2
+  --   , ValProc $ Label $ Ident "myLabel2"
+  --   , ValNum 1
+  --   ]
       
   ] 
 

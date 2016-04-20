@@ -27,7 +27,7 @@ data Value = ValNum Integer
              deriving (Show, Eq)
 
 class Eval a where
-  eval :: a -> SymbolTable -> Value
+  eval :: a -> SymbolTable -> Either String Value
 
 data TopLevel = TopStmt Stmt
               | TopMacro Macro

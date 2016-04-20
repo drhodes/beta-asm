@@ -1,6 +1,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 module Uasm.Expand where
 
+import           Control.Monad
 import           Uasm.Eval
 import qualified Uasm.SymbolTable as SymTab
 import           Uasm.Types
@@ -27,16 +28,17 @@ instance Expand TopLevel where
 instance Expand Stmt where
   expand (StmtCall call) st = expand call st
   expand (StmtAssn assn) st = expand assn st
-  expand s@(StmtExpr expr) st = (Right [eval expr st], st)
+  expand s@(StmtExpr expr) st = (sequence [eval expr st], st)
   expand s@(StmtProc proc) st = (Right [ValProc proc], st)
 
 instance Expand Assn where
   expand (Assn ident expr) st = 
     let k = KeyIdent ident
     in if ident == CurInstruction          
-       then (Right [ValDotAssn (eval expr st)], st)
-       else (Right [], SymTab.insert k (eval expr st) st)
-
+       then (sequence $ [liftM ValDotAssn $ eval expr st], st)
+       -- else (Right [], liftM SymTab.insert k (eval expr st) st)
+       else (Right [], SymTab.insert k (ValExpr expr) st)
+            
 instance Expand Call where
   expand (Call ident exprs) st =
     let k = KeyMacro ident (length exprs)
