@@ -1,9 +1,9 @@
-module TestMacro where
+module TestExpand where
 
 import           Uasm.Parser
 import           Uasm.Types
 import           Uasm.Eval
-import           Uasm.Macro
+import           Uasm.Expand
 import qualified Uasm.SymbolTable as SymTab
   
 import qualified Text.Parsec as TP

@@ -1,5 +1,5 @@
 {-# LANGUAGE FlexibleInstances #-}
-module Uasm.Macro where
+module Uasm.Expand where
 
 import           Uasm.Eval
 import qualified Uasm.SymbolTable as SymTab

@@ -9,7 +9,7 @@ clean: FORCE ## clean all the things
 	sh clean.sh
 
 work: ## open all files in editor
-	emacs -nw Makefile battle-plan.org src/Uasm/*.hs app/*.hs test/*.hs
+	emacs -nw *.cabal Makefile battle-plan.org src/Uasm/*.hs app/*.hs test/*.hs
 
 setup:
 	touch battle-plan.org

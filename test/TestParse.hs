@@ -4,7 +4,7 @@
 import           Uasm.Parser
 import           Uasm.Types
 import qualified Text.Parsec as TP
-import qualified TestMacro as TM
+import qualified TestExpand as TE
 import           Text.Parsec.Error
 import           Text.Parsec.String
 import           Control.Monad
@@ -21,8 +21,8 @@ main = defaultMain tests
 
 tests :: TestTree
 tests = testGroup "Tests" [ parseTests
-                          , TM.testAll
-                          , TM.testLabels
+                          , TE.testAll
+                          , TE.testLabels
                           ]
 
 parseTests = testGroup "Parse tests"
