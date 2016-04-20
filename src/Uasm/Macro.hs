@@ -22,9 +22,7 @@ instance (Expand e) => Expand [e] where
 instance Expand TopLevel where
   expand (TopStmt stmt) st = expand stmt st
   expand (TopMacro mac@(Macro name args  _)) st =
-    ( Right []
-    , SymTab.insert
-      (KeyMacro name (length args)) (ValMacro mac) st)
+    (Right [], SymTab.insert (KeyMacro name (length args)) (ValMacro mac) st)
 
 instance Expand Stmt where
   expand (StmtCall call) st = expand call st

@@ -7,6 +7,7 @@ import           Uasm.Types
 new = SymTab DM.empty NullTable
 
 lookup :: SymbolKey -> SymbolTable -> Maybe Value
+lookup (KeyIdent CurInstruction) _ = Just (ValIdent CurInstruction)
 lookup k NullTable = Nothing
 lookup k (SymTab cur next) =
   case DM.lookup k cur of

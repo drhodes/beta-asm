@@ -1,5 +1,6 @@
 {-# LANGUAGE MonomorphismRestriction #-}
 {-# LANGUAGE FlexibleContexts #-}
+
 import           Uasm.Parser
 import           Uasm.Types
 import qualified Text.Parsec as TP
@@ -19,35 +20,12 @@ import           Data.Ord
 main = defaultMain tests
 
 tests :: TestTree
--- tests = testGroup "Tests" [properties, unitTests]
-tests = testGroup "Tests" [unitTests, TM.testAll]
+tests = testGroup "Tests" [ parseTests
+                          , TM.testAll
+                          , TM.testLabels
+                          ]
 
--- properties :: TestTree
--- properties = testGroup "Properties" [scProps, qcProps]
-
--- scProps = testGroup "(checked by SmallCheck)"
---   [ SC.testProperty "sort == sort . reverse" $
---       \list -> sort (list :: [Int]) == sort (reverse list)
---   , SC.testProperty "Fermat's little theorem" $
---       \x -> ((x :: Integer)^7 - x) `mod` 7 == 0
---   -- the following property does not hold
---   , SC.testProperty "Fermat's last theorem" $
---       \x y z n ->
---         (n :: Integer) >= 3 SC.==> x^n + y^n /= (z^n :: Integer)
---   ]
-
--- qcProps = testGroup "(checked by QuickCheck)"
---   [ QC.testProperty "sort == sort . reverse" $
---       \list -> sort (list :: [Int]) == sort (reverse list)
---   , QC.testProperty "Fermat's little theorem" $
---       \x -> ((x :: Integer)^7 - x) `mod` 7 == 0
---   -- the following property does not hold
---   , QC.testProperty "Fermat's last theorem" $
---       \x y z n ->
---         (n :: Integer) >= 3 QC.==> x^n + y^n /= (z^n :: Integer)
---   ]
-
-unitTests = testGroup "Parse tests"
+parseTests = testGroup "Parse tests"
   [ testCase "Idents parse" $ testIdent
   , testCase "testFile" $ testFile "beta.uasm"
   , testCase "testLitNums" $ testLitNums 
@@ -64,7 +42,7 @@ unitTests = testGroup "Parse tests"
 
 assertParse :: (Eq a, Show a) => TP.Parsec [Char] () a -> [Char] -> a -> IO ()
 assertParse rule str val = do
-  let result = TP.parse rule "" str
+  let result = TP.parse (rule <* TP.eof) "" str
   case result of
     (Right v) -> if v == val
                  then return ()
@@ -178,8 +156,6 @@ testCall = do
   j "A_(1,2,3,4,-0x123)"
   j "Asdf()"
 
-
-
 testMacro = do
   let f = assertParse macro
       mac1 = (Macro (Ident "Add")
@@ -192,8 +168,8 @@ testMacro = do
   f (".macro Add(A,B) A+B\n") mac1
   f (".macro Add(A,B) A+B \n") mac1
   f (".macro Add(A,B) { A + B }") mac1
-  f (".macro Add(A,B) {\n A + B\n } ") mac1
-  f (".macro Add(A,B) { A + B\n } ") mac1
+  f (".macro Add(A,B) {\n A + B\n }") mac1
+  f (".macro Add(A,B) { A + B\n }") mac1
   
 testStmt = do
   let f = assertParse stmt
