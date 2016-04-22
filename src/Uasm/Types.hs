@@ -2,7 +2,8 @@ module Uasm.Types where
 
 import qualified Data.Map as DM
 
-data SymbolTable = SymTab { symTabCurScope :: DM.Map SymbolKey Value
+data SymbolTable = SymTab { symTabCurScope :: DM.Map SymbolKey Expr
+                          , symTabCurMacroScope :: DM.Map SymbolKey Macro
                           , symTabNextScope :: SymbolTable }
                  | NullTable
                  deriving (Show, Eq)
@@ -20,6 +21,7 @@ data Value = ValNum Integer
            | ValMacro Macro
            | ValIdent Ident
            | ValExpr Expr
+           | ValTerm Term
            | ValProc Proc
            | ValDotAssn Value
            | NegVal Value
@@ -37,7 +39,8 @@ data Stmt = StmtProc Proc
           | StmtCall Call
           | StmtAssn Assn
           | StmtExpr Expr
-            deriving (Show, Eq)
+          | StmtMany [Stmt]
+          deriving (Show, Eq)
 
 data Macro = Macro Ident [Ident] [Stmt] deriving (Show, Eq)
 

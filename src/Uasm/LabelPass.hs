@@ -11,6 +11,7 @@ import           Uasm.Types
 {- Macros have been expanded. Label addresses are still unknown. Current
 address identifiers (.) can now be evaluated, and must be
 -}
+{-
 type CurAddr = Integer
 
 class FixDot a where
@@ -28,30 +29,34 @@ fixDots (x:xs) addr st =
     Left msg -> error msg
 
 instance FixDot Value where
-  fixdot (ValNum n) addr st = Right (Just $ ValNum n, addr, st)
+  fixdot (ValNum n) addr st = Right (Just $ ValNum n, addr + 1, st)
+  
   fixdot (ValDotAssn val) addr st =
     do (r, next, st2) <- fixdot val addr st
        case r of
          (Just (ValNum n)) -> Right (Nothing, next + n, st2)
          _ -> Left "Impossible fixdot didn't get a num when evaling the dot assignment"
+         
   fixdot (ValIdent CurInstruction) addr st = Right (Just $ ValNum addr, addr, st)
+  
   fixdot (Delayed op val1 val2) addr st =
     do (Just r1, _, st1) <- fixdot val1 addr st
        (Just r2, _, st2) <- fixdot val2 addr st1
        temp <- eval (Delayed op r1 r2) st2
        return (Just temp, addr, st2)
        
-  fixdot (ValProc p) addr st =
+  fixdot (ValProc p) addr st = 
     do (r, addr2, st2) <- fixdot p addr st
-       case r of
-         (Just p2) -> return (Just $ ValProc p2, addr2, st2)
-         Nothing -> return (Nothing, addr2, st2)
+       return (liftM ValProc r, addr2, st2)
        
-  fixdot x _ _ = error (show x)
-
+  fixdot (ValExpr e) addr st =
+    do v <- eval e st
+       return (Just v, addr + 1, st)
+    
+  fixdot x _ _ = error $ "Need to implemenet Fixdot Value for: " ++ (show x)
 
 instance FixDot Proc where
-  fixdot (Label ident) addr st =
+  fixdot (Label ident) addr st = 
     Right (Nothing, addr, SymTab.insert (KeyIdent ident) (ValNum addr) st)
   -- fixdot (DotInclude string) addr st = error "fixdot (DotInclude string) addr st"
   -- fixdot (DotAlign expr) addr st = error "fixdot (DotAlign expr) addr st"
@@ -76,3 +81,4 @@ instance FixDot Proc where
 --     Delayed binop val1 val2
 --     ValNum n -> v
     
+-}

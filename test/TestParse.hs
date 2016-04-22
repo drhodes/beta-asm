@@ -6,6 +6,7 @@ import           Uasm.Types
 import qualified Text.Parsec as TP
 import qualified TestExpand as TE
 import qualified TestFixDot as TFD
+import qualified TestBind as TB
 import           Text.Parsec.Error
 import           Text.Parsec.String
 import           Control.Monad
@@ -24,7 +25,8 @@ tests :: TestTree
 tests = testGroup "Tests" [ parseTests
                           , TE.testAll
                           , TE.testLabels
-                          , TFD.assigns
+                          , TB.tests
+                          -- , TFD.assigns
                           ]
 
 parseTests = testGroup "Parse tests"
@@ -53,7 +55,7 @@ assertParse rule str val = do
     (Left msg) -> error (show msg)
 
 justParse :: (Eq a, Show a) => TP.Parsec [Char] () a -> [Char] -> IO ()
-justParse rule str = do
+justParse rule str = do  
   let result = TP.parse (rule <* TP.eof) "" str
   case result of
     (Right v) -> return ()

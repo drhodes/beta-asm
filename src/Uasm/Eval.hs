@@ -4,7 +4,7 @@ import           Control.Monad
 import           Uasm.Parser
 import qualified Uasm.SymbolTable as SymTab
 import           Uasm.Types
-
+{-
 negateVal (ValNum n) = ValNum (-n)
 netateVal (ValIdent n) = NegVal (ValIdent n)
 
@@ -33,10 +33,10 @@ instance Eval Expr where
   eval (ExprBinTail binop term) st = error "eval (ExprBinTail binop term)"
 
 instance Eval Term where
-  eval (TermIdent ident) st =
+  eval t@(TermIdent ident) st =
     case SymTab.lookup (KeyIdent ident) st of
       Just val -> return val
-      Nothing -> fail $ "Can't find identifier: " ++ show ident ++ (show st)
+      Nothing -> Left $ "Can't find identifier: " ++ show ident ++ (show st) 
   eval (TermLitNum (LitNum n)) st = return $ ValNum n
   eval (TermNeg term) st = liftM negateVal (eval term st)
   eval (TermExpr expr) st = eval expr st
@@ -44,9 +44,11 @@ instance Eval Term where
 instance Eval Value where
   eval (ValExpr x) st = eval x st
   eval (Delayed bop v1 v2) st = do return $ opVal bop v1 v2
+
+  -}
   -- eval (ValIdent Ident)
 
-  eval x _ = Right x
+  -- eval x _ = error undefined --Right x
   -- eval (ValDotAssn v)
   -- eval (NegVal v)
   -- eval (ValNum Integer)

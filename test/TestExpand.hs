@@ -17,66 +17,82 @@ import Test.Tasty.HUnit
 unitTests = testGroup "Unit tests"
 
 testAll = testGroup "TestExpand.hs"
-  [ testCase "testSomething1" $ testSomething1
-  -- , testCase "testSomething2" $ testSomething2
-  , testCase "testDot1" $ testExpand "." [ValIdent CurInstruction]
+  [ testCase "test1" $ testExpand "."
+    [TopStmt $ StmtExpr $ ExprTerm $ TermIdent CurInstruction
+    ]
     
-  , testCase "testDot2" $ testExpand ". ." [ ValIdent CurInstruction
-                                          , ValIdent CurInstruction]
-  -- , testCase "testSomething4" $ testSomething4
+  -- , testCase "test2" $ testExpand "a=1 \n b=a \n .macro M1(c) {b + c} \n M1(5)"
+  --   []
+    
+    -- testCase "testSomething1" $ testSomething1
+    -- , testCase "testSomething2" $ testSomething2
+    -- , testCase "testDot1" $ testExpand "." [ValIdent CurInstruction]
+    
+    -- , testCase "testDot2" $ testExpand ". ." [ ValIdent CurInstruction
+    --                                         , ValIdent CurInstruction]
+    -- , testCase "testSomething4" $ testSomething4
   ] 
-
 
 testLabels = testGroup "Label Tests"
-  [ testCase "label1" $ testExpand "0x1 \n myLabel: \n 0b10"
-    [ ValNum 1 
-    , ValProc $ Label $ Ident "myLabel"
-    , ValNum 2 
-    ]
-
-    ------------------------------------------------------------------
-  , testCase "label2" $ testExpand "myLabel1: 10 \n myLabel2: 20"
-    [ ValProc $ Label $ Ident "myLabel1"
-    , ValNum 10
-    , ValProc $ Label $ Ident "myLabel2"
-    , ValNum 20
-    ]
-
-    ------------------------------------------------------------------
-  -- , testCase "label3" $ testExpand "a=1 a+a myLabel2: a*a"
-  --   [ ValNum 2
-  --   , ValProc $ Label $ Ident "myLabel2"
-  --   , ValNum 1
+  [
+  --   testCase "label1" $ testExpand "0x1 \n myLabel: \n 0b10"
+  --   [ ValNum 1 
+  --   , ValProc $ Label $ Ident "myLabel"
+  --   , ValNum 2 
   --   ]
-      
-  ] 
 
+  --   ------------------------------------------------------------------
+  -- , testCase "label2" $ testExpand "myLabel1: 10 \n myLabel2: 20"
+  --   [ ValProc $ Label $ Ident "myLabel1"
+  --   , ValNum 10
+  --   , ValProc $ Label $ Ident "myLabel2"
+  --   , ValNum 20
+  --   ]
+
+  --   ------------------------------------------------------------------
+  -- -- , testCase "label3" $ testExpand "a=1 a+a myLabel2: a*a"
+  -- --   [ ValNum 2
+  -- --   , ValProc $ Label $ Ident "myLabel2"
+  -- --   , ValNum 1
+  -- --   ]
+
+
+
+  -- , testCase "label4" $ testExpand ". = . + 4 \n myLabel: \n .+myLabel" []
+
+    
+  ] 
+{-
 testSomething1 :: IO ()
 testSomething1 = do
-  let prog = "a=1+1 .macro Add(x){x} Add(asdf) asdf:"
-      expect = [ ValExpr (ExprTermExpr (TermIdent (Ident "asdf")) [])
-               , ValProc (Label (Ident "asdf"))]
+  let prog = "a=1+1 .macro Add(x){x} Add(a)"
+      expect = []
   testExpand prog expect
+
 
 testSomething2 :: IO ()
 testSomething2 = do
-  testExpand "a=1+1 b=a+1 c=b+1 c+1" [ValNum 5]
+  testExpand "a=1+1 b=a+1 c=b+1 c+1" []
   
 testSomething4 :: IO ()
 testSomething4 = do
   let prog = concat [ ".macro Add(x, y) {x + y}"
                     , "Add(1,2)"
                     ]
-  testExpand prog [ValNum 3]
+  testExpand prog []
+-}
 
-
-testExpand :: String -> [Value] -> IO ()
+testExpand :: String -> [TopLevel] -> IO ()
 testExpand prog val = do  
   case TP.parse (TP.many topLevel) "" prog of
-    (Right ast) ->
-      let (result, _) = expand ast SymTab.new
-      in if result == Right val
-         then return () 
-         else error $ show ("Fail", prog, result, val)
+    (Right tops) ->
+      do xs <- runExpandErr expandTopLevels tops
+         case xs of
+           (Right topLevels) -> print topLevels
+             
+             -- if val == topLevels
+             -- then return () 
+             -- else error $ show ("Fail", prog, xs, val)
+           (Left msg) ->
+             error msg
     (Left msg) -> error (show msg)
-
