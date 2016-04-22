@@ -18,11 +18,19 @@ unitTests = testGroup "Unit tests"
 
 testAll = testGroup "TestExpand.hs"
   [ testCase "test1" $ testExpand "."
-    [TopStmt $ StmtExpr $ ExprTerm $ TermIdent CurInstruction
-    ]
+    [TopStmt (StmtExpr (ExprTermExpr (TermIdent CurInstruction) []))]
     
-  -- , testCase "test2" $ testExpand "a=1 \n b=a \n .macro M1(c) {b + c} \n M1(5)"
-  --   []
+  , testCase "test2" $ testExpand "a=1 \n b=a \n .macro M1(c) {b + c} \n M1(5)"
+    [ TopStmt (StmtAssn (Assn (Ident "a") (ExprTermExpr (TermLitNum (LitNum 1)) [])))
+    , TopStmt (StmtAssn (Assn (Ident "b") (ExprTermExpr (TermIdent (Ident "a")) [])))
+    , TopMacro (Macro (Ident "M1")
+                [Ident "c"]
+                [StmtExpr (ExprTermExpr (TermIdent (Ident "b")) [ExprBinTail Addition (TermIdent (Ident "c"))])])
+    , TopStmt (StmtMany
+               [StmtExpr (ExprTermExpr (TermExpr (ExprTermExpr (TermIdent (Ident "a")) []))
+                          [ExprBinTail Addition (TermExpr (ExprTermExpr (TermLitNum (LitNum 5)) []))])])]
+    
+
     
     -- testCase "testSomething1" $ testSomething1
     -- , testCase "testSomething2" $ testSomething2
@@ -72,6 +80,7 @@ testSomething1 = do
 
 testSomething2 :: IO ()
 testSomething2 = do
+
   testExpand "a=1+1 b=a+1 c=b+1 c+1" []
   
 testSomething4 :: IO ()
@@ -83,16 +92,14 @@ testSomething4 = do
 -}
 
 testExpand :: String -> [TopLevel] -> IO ()
-testExpand prog val = do  
+testExpand prog expect = do  
   case TP.parse (TP.many topLevel) "" prog of
     (Right tops) ->
-      do xs <- runExpandErr expandTopLevels tops
-         case xs of
-           (Right topLevels) -> print topLevels
-             
-             -- if val == topLevels
-             -- then return () 
-             -- else error $ show ("Fail", prog, xs, val)
+      do case expand expandTopLevels tops of
+           (Right (topLevels, symtab)) -> 
+             if topLevels == expect
+             then return () 
+             else error $ show ("Fail", prog, "Expected", expect, "Got", topLevels)
            (Left msg) ->
              error msg
     (Left msg) -> error (show msg)

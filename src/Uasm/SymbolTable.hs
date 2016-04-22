@@ -5,7 +5,8 @@ import qualified Data.Map as DM
 import           Prelude hiding (lookup)
 import           Uasm.Types
 import Control.Monad.State
-import           Control.Monad.Trans.Except
+import Control.Monad.Except
+import Control.Monad.Trans.Except
 
 new = SymTab DM.empty DM.empty NullTable
 
@@ -59,7 +60,7 @@ mLookupMacro k =
 mInsertMacro mac@(Macro ident args _) =
   do st <- get
      case st of
-       NullTable -> throwE "Can't somethign soemthing null symbol table"
+       NullTable -> throwError "Can't somethign soemthing null symbol table"
        (SymTab exprs macs next) ->
          do let macs' = DM.insert (KeyMacro ident (length args)) mac macs
             put $ SymTab exprs macs' next
