@@ -10,6 +10,7 @@ import qualified Data.Map as DM
 import           Data.Functor.Identity
 import Control.Monad.Identity
 import           Uasm.Bind
+import           Uasm.Pretty
 import qualified Uasm.SymbolTable as SymTab
 import           Uasm.Types
 import Control.Applicative
@@ -17,27 +18,32 @@ import Control.Monad.State
 import Control.Monad.Except
 import Control.Monad.Trans.Except
 import Data.Functor.Identity
-
+import qualified Text.PrettyPrint.Leijen as PP
 
 type ExpandErr a b = forall m. ( MonadState SymbolTable m,
                                  MonadError String m ) => a -> m b
 
-runStateExceptT :: Monad m => s -> ExceptT e (StateT s m) a -> m (Either e a, s)
+-- runStateExceptT :: Monad m => s -> ExceptT e (StateT s m) a -> m (Either e a, s)
+
+runStateExceptT :: s -> ExceptT e (StateT s m) a -> m (Either e a, s)
 runStateExceptT s = flip runStateT s . runExceptT
 
 runExceptStateT :: Monad m => s -> StateT s (ExceptT e m) a -> m (Either e (a, s))
 runExceptStateT s = runExceptT . flip runStateT s
 
-foo = runIdentity . runExceptStateT (SymTab.build [(KeyIdent (Ident "a")
-                                                   , ExprTerm (TermLitNum (LitNum 3)))]) $
-  expandTerm (TermIdent (Ident "a"))
-
-expand :: (t -> StateT SymbolTable (ExceptT e Identity) a) -> t -> Either e (a, SymbolTable)
 expand expandFunc node = runIdentity . runExceptStateT (SymTab.new) $ expandFunc node
+
+flattenTops :: [TopLevel] -> [Stmt]
+flattenTops [] = []
+flattenTops ((TopStmt stmt):rest) = flattenStmt stmt ++ (flattenTops rest)
+flattenTops ((TopMacro _):rest) = flattenTops rest
+
+flattenStmt (StmtMany stmts) = concat $ map flattenStmt stmts
+flattenStmt (StmtExpr (ExprTerm (TermExpr x))) = flattenStmt (StmtExpr x)
+flattenStmt x = [x]
 
   
 expandTopLevels xs = mapM expandTopLevel xs
-
 
 expandTopLevel :: ExpandErr TopLevel TopLevel
 expandTopLevel (TopStmt stmt) = TopStmt <$> expandStmt stmt
@@ -52,7 +58,10 @@ expandStmt (StmtMany stmts) = StmtMany <$> mapM expandStmt stmts
 
 -- expandCall takes a macro call and expands it into statements with
 -- as many identifiers bound as possible.  Some of the identifiers may
--- be labels, and if so then they must be left alone until the label pass.
+-- be labels, and if so then they must be left alone until the label
+-- pass.  Why? No expressions have been evaluated yet, and some
+-- expressions involve the (.) current instruction, therefore label
+-- addresses can't be known, yet.
 
 expandCall :: ExpandErr Call Stmt
 expandCall (Call ident exprs) =
@@ -67,12 +76,16 @@ bindMacro exprs (Macro name args stmts) =
   -- flatten macro into many statements
   do when (length args /= length exprs) $
        throwError "(Improbable error) in Expand.bindMacro, argument length mismatch"
-     curScope <- get
+     curScope <- get     
      -- bind exprs to argument idents and construct new symbol table
-     let (SymTab ids macs _) = SymTab.build (zip (map KeyIdent args) exprs)
+     exprs' <- mapM expandExpr exprs
+     let (SymTab ids macs _) = SymTab.build (zip (map KeyIdent args) exprs')
+     
      -- push the new symbol table to give priority to argument
      -- identifiers.
      put (SymTab ids macs curScope)
+     
+     -- throwError $ show (SymTab ids macs curScope)
      -- expand statments defined by the macro
      stmts <- StmtMany <$> mapM expandStmt stmts
      -- done expanding, restore current scope
@@ -88,28 +101,22 @@ expandAssn assn@(Assn ident expr) =
 
 expandTerm :: ExpandErr Term Term
 expandTerm term@(TermIdent ident) =
-  do let k = KeyIdent ident
+  do let k = KeyIdent ident     
      if ident == CurInstruction          
        then return term
        else do expr <- SymTab.mLookup k
-               case expr of                 
+               case expr of
                  Just expr -> return $ TermExpr expr
-                 Nothing -> do st <- get
-                               throwError (show (expr))
-                 
+                 Nothing -> throwError $ "Couldn't find term: " ++ (show ident)
 
 expandTerm (TermExpr expr) = TermExpr <$> expandExpr expr
 expandTerm (TermNeg term) = TermNeg <$> expandTerm term
 expandTerm term = return term
 
--- expandExpr :: (MonadState SymbolTable m, MonadError String m) => Expr -> m Expr
 expandExpr :: ExpandErr Expr Expr
 expandExpr (ExprNeg expr) = ExprNeg <$> expandExpr expr
 expandExpr (ExprTerm term) = ExprTerm <$> expandTerm term
+expandExpr (ExprTermExpr term []) = ExprTerm <$> expandTerm term
 expandExpr (ExprTermExpr term exprs) =
   liftM2 ExprTermExpr (expandTerm term) (mapM expandExpr exprs)
 expandExpr (ExprBinTail binop term) = ExprBinTail binop <$> expandTerm term
-
-
--- temp = do s <- evalStateT (expandTerm (TermLitNum (LitNum 3))) SymTab.new
---           return s

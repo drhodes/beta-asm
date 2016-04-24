@@ -19,12 +19,15 @@ library
                      , Uasm.Eval
                      , Uasm.Types 
                      , Uasm.Expand
+                     , Uasm.Pretty
                      , Uasm.Bind
                      , Uasm.SymbolTable
                      , Uasm.LabelPass
                           
-  build-depends:       base >= 4.7 && < 5
+  build-depends:       GenericPretty >= 1.2.1
+                     , base >= 4.7 && < 5
                      , containers >= 0.5.6.2
+                     , generic-pretty >= 0.1.0
                      , hex >= 0.1.2
                      , mtl >= 2.2.1
                      , parsec >= 3.1.9
@@ -40,11 +43,13 @@ test-suite beta-asm-test
   hs-source-dirs:      test  
   main-is:             TestParse.hs
   build-depends:       
-                         HUnit
+                             HUnit
+                       , GenericPretty >= 1.2.1
                        , QuickCheck
                        , base
                        , beta-asm
                        , containers >= 0.5.6.2
+                       , generic-pretty >= 0.1.0
                        , hex >= 0.1.2
                        , mtl
                        , parallel

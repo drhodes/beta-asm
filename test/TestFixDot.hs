@@ -15,6 +15,11 @@ import           Control.Monad
 import Test.Tasty
 import Test.Tasty.HUnit
 
+
+
+
+
+
 {-
 assigns = testGroup "Dot Assigs"
   [ testCase "dot assn 0" $ fixDotTest ". = 4 \n " []

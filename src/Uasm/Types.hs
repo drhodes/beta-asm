@@ -1,3 +1,6 @@
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE DeriveGeneric #-}
+
 module Uasm.Types where
 
 import qualified Data.Map as DM
@@ -7,16 +10,11 @@ data SymbolTable = SymTab { symTabCurScope :: DM.Map SymbolKey Expr
                           , symTabNextScope :: SymbolTable }
                  | NullTable
                  deriving (Show, Eq)
-
--- instance Show SymbolTable where
---   show NullTable = "<Null SymbolTable>"
---   show (SymTab cur next) = 
-
                           
 data SymbolKey = KeyMacro Ident Int
                | KeyIdent Ident
                  deriving (Show, Eq, Ord)
-
+  
 data Value = ValNum Integer
            | ValMacro Macro
            | ValIdent Ident
@@ -85,7 +83,9 @@ data Term = TermIdent Ident
 
 data Ident = Ident String
            | CurInstruction
+           | PlacedInstruction Integer
              deriving (Show, Eq, Ord)
 
 data LitNum = LitNum Integer deriving (Show, Eq)
+
 

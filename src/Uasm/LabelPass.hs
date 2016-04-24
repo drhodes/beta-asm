@@ -1,19 +1,58 @@
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE RankNTypes #-}
 module Uasm.LabelPass where
 
 import qualified Uasm.SymbolTable as SymTab
 
+import           Control.Applicative
 import           Control.Monad
+import           Control.Monad.Except
+import           Control.Monad.Identity
+import           Control.Monad.State
+import           Control.Monad.State
+import           Control.Monad.Trans.Except
+import           Control.Monad.Trans.Except
+import           Data.Functor.Identity
+import           Data.Functor.Identity
+import qualified Data.Map as DM
 import           Data.Word
+import           Uasm.Bind
 import           Uasm.Eval
 import           Uasm.Parser
+import qualified Uasm.SymbolTable as SymTab
 import           Uasm.Types
 
-{- Macros have been expanded. Label addresses are still unknown. Current
-address identifiers (.) can now be evaluated, and must be
--}
 {-
-type CurAddr = Integer
+Macros have been expanded.  Label addresses are unknown because
+expressions havn't been evaluated. Current address identifiers (.)
+can be determined.
+-}
 
+data PlaceState = PlaceState { psCurAddr :: Integer
+                             , psSymbolTable :: SymbolTable
+                             } deriving (Show, Eq)
+
+newPlaceState = PlaceState 0 (SymTab.new)
+
+type ExpandErr a b = forall m. ( MonadState PlaceState m,
+                                 MonadError String m ) => a -> m b
+
+runStateExceptT :: Monad m => s -> ExceptT e (StateT s m) a -> m (Either e a, s)
+runStateExceptT s = flip runStateT s . runExceptT
+
+runExceptStateT :: Monad m => s -> StateT s (ExceptT e m) a -> m (Either e (a, s))
+runExceptStateT s = runExceptT . flip runStateT s
+
+expand fixFunc node = runIdentity . runExceptStateT (newPlaceState) $ fixFunc node
+
+
+
+
+
+  
+
+
+{-
 class FixDot a where
   fixdot :: a -> CurAddr -> SymbolTable -> Either String (Maybe a, CurAddr, SymbolTable)
 

@@ -4,7 +4,9 @@ import           Uasm.Parser
 import           Uasm.Types
 import           Uasm.Eval
 import           Uasm.Expand
+import qualified Uasm.Pretty as PP
 import qualified Uasm.SymbolTable as SymTab
+import Text.PrettyPrint.Leijen
   
 import qualified Text.Parsec as TP
 import           Text.Parsec.Error
@@ -18,21 +20,23 @@ unitTests = testGroup "Unit tests"
 
 testAll = testGroup "TestExpand.hs"
   [ testCase "test1" $ testExpand "."
-    [TopStmt (StmtExpr (ExprTermExpr (TermIdent CurInstruction) []))]
+    [StmtExpr (ExprTerm (TermIdent CurInstruction))]
     
   , testCase "test2" $ testExpand "a=1 \n b=a \n .macro M1(c) {b + c} \n M1(5)"
-    [ TopStmt (StmtAssn (Assn (Ident "a") (ExprTermExpr (TermLitNum (LitNum 1)) [])))
-    , TopStmt (StmtAssn (Assn (Ident "b") (ExprTermExpr (TermIdent (Ident "a")) [])))
-    , TopMacro (Macro (Ident "M1")
-                [Ident "c"]
-                [StmtExpr (ExprTermExpr (TermIdent (Ident "b")) [ExprBinTail Addition (TermIdent (Ident "c"))])])
-    , TopStmt (StmtMany
-               [StmtExpr (ExprTermExpr (TermExpr (ExprTermExpr (TermIdent (Ident "a")) []))
-                          [ExprBinTail Addition (TermExpr (ExprTermExpr (TermLitNum (LitNum 5)) []))])])]
+    [ StmtAssn (Assn (Ident "a") (ExprTermExpr (TermLitNum (LitNum 1)) []))
+    , StmtAssn (Assn (Ident "b") (ExprTermExpr (TermIdent (Ident "a")) []))
+    , StmtExpr (ExprTermExpr (TermExpr (ExprTermExpr (TermIdent (Ident "a")) []))
+                [ExprBinTail Addition (TermExpr (ExprTerm (TermLitNum (LitNum 5))))])]
     
+  -- , testCase "test3" $ testExpand "a=1 b=2 .macro M1(a){a} M1(2)"
+  --   [ (StmtAssn (Assn (Ident "a") (ExprTermExpr (TermLitNum (LitNum 1)) [])))
+  --   , (StmtAssn (Assn (Ident "b") (ExprTermExpr (TermLitNum (LitNum 2)) [])))
+  --   , (StmtExpr (ExprTermExpr (TermExpr (ExprTermExpr (TermLitNum (LitNum 2)) [])) []))]
 
-    
-    -- testCase "testSomething1" $ testSomething1
+  , testCase "test4" $ testExpand ".macro M1(a){a} .macroM2(a){M1(a) M1(a)} M2(1)"
+    [ StmtExpr (ExprTerm (TermLitNum (LitNum 1)))
+    , StmtExpr (ExprTerm (TermLitNum (LitNum 1)))]
+    -- testcase "testSomething1" $ testSomething1
     -- , testCase "testSomething2" $ testSomething2
     -- , testCase "testDot1" $ testExpand "." [ValIdent CurInstruction]
     
@@ -91,15 +95,23 @@ testSomething4 = do
   testExpand prog []
 -}
 
-testExpand :: String -> [TopLevel] -> IO ()
 testExpand prog expect = do  
   case TP.parse (TP.many topLevel) "" prog of
     (Right tops) ->
       do case expand expandTopLevels tops of
-           (Right (topLevels, symtab)) -> 
-             if topLevels == expect
-             then return () 
-             else error $ show ("Fail", prog, "Expected", expect, "Got", topLevels)
+           (Right (topLevels, symtab)) ->
+             let result = flattenTops topLevels
+             in if result == expect
+                then do return () 
+                else do putStrLn "\nFail"
+                        putStrLn prog
+                        putStrLn "\nExpected"
+                        print expect
+                        putStrLn "\nGot"
+                        print result
+                        putStrLn "\nTopLevels parsed"
+                        print tops
+                        error "test fails"
            (Left msg) ->
              error msg
     (Left msg) -> error (show msg)

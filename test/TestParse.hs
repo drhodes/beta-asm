@@ -107,9 +107,9 @@ testExpr = do
 
   case TP.parse expr2 "" "((a+b+c))" of
     (Right val1) -> do f "((a+b+c))" val1
-                       f "( (a+b+c))" val1
+                       f "( (a+b+c))" val1 
                        f "(( a+b+c))" val1
-                       f "( (a+b+  c) )" val1
+                       f "( (a+b+  c) )" val1 
                        f "(( a+ b+c))" val1
                        f "(   (   a + b + c )  )" val1
                        f "((a + b + c)  )" val1
@@ -202,9 +202,7 @@ testStmt = do
   j ". = 23 << 1"
   j ". = 1+(-0x23 << --0b01)"
 
-
 testFile file = setupTest (TP.many topLevel) file
-
 
 setupTest parser file = do
   txt <- readFile $ "./test/uasm/" ++ file
