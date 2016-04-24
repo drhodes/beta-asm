@@ -14,7 +14,9 @@ data SymbolTable = SymTab { symTabCurScope :: DM.Map SymbolKey Expr
 data SymbolKey = KeyMacro Ident Int
                | KeyIdent Ident
                  deriving (Show, Eq, Ord)
-  
+
+type Address = Integer
+                          
 data Value = ValNum Integer
            | ValMacro Macro
            | ValIdent Ident
@@ -22,12 +24,14 @@ data Value = ValNum Integer
            | ValTerm Term
            | ValProc Proc
            | ValDotAssn Value
+           | ValAssn Assn
            | NegVal Value
+           | ValNop
            | Delayed Binop Value Value
              deriving (Show, Eq)
 
-class Eval a where
-  eval :: a -> SymbolTable -> Either String Value
+-- class Eval a where
+--   eval :: a -> SymbolTable -> Either String Value
 
 data TopLevel = TopStmt Stmt
               | TopMacro Macro

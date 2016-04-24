@@ -5,7 +5,7 @@ import           Uasm.Parser
 import           Uasm.Types
 import qualified Text.Parsec as TP
 import qualified TestExpand as TE
-import qualified TestFixDot as TFD
+import qualified TestLabelPass as TLP
 import qualified TestBind as TB
 import           Text.Parsec.Error
 import           Text.Parsec.String
@@ -24,7 +24,7 @@ main = defaultMain tests
 tests :: TestTree
 tests = testGroup "Tests" [ parseTests
                           , TE.testAll
-                          , TE.testLabels
+                          , TLP.testAll
                           , TB.tests
                           -- , TFD.assigns
                           ]
@@ -99,8 +99,8 @@ testExpr = do
                [ExprBinTail Addition (TermLitNum (LitNum 2))])
 
   let abc = (ExprTermExpr (TermIdent (Ident "a"))
-             [ExprBinTail Addition (TermIdent (Ident "b")),
-              ExprBinTail Addition (TermIdent (Ident "c"))])
+             [ ExprBinTail Addition (TermIdent (Ident "b")),
+               ExprBinTail Addition (TermIdent (Ident "c"))])
 
   f ("a+b+c") abc
   f ("-a") (ExprNeg (ExprTermExpr (TermIdent (Ident "a")) []))
@@ -232,10 +232,8 @@ eraseBlockComment src@(c:str) inComment =
 eraseComments src =
   (eraseLineComment
    (eraseBlockComment src False) False)
-  
 
 {-
-
 ------------------------------------------------------------------    
     
 def testMacro0():
