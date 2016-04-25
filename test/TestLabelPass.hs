@@ -26,30 +26,31 @@ testAll = testGroup "TestLabelPass.hs"
 
     --------------------------------------------
   , testCase "test2" $ testLabelPass ". ."
-    [ValNum 0, ValNum 4]
+    [ValNum 0, ValNum 1]
     --------------------------------------------
   , testCase "test3" $ testLabelPass ".\n."
-    [ValNum 0, ValNum 4]
+    [ValNum 0, ValNum 1]
     
 
     --------------------------------------------
   , testCase "test4" $ testLabelPass ".."
-    [ValNum 0, ValNum 4]
+    [ValNum 0, ValNum 1]
 
     --------------------------------------------
   , testCase "test5" $ testLabelPass ".=4"    
-    [ ValNop ]
+    [ ValSeq [ValNum 0, ValNum 0, ValNum 0, ValNum 0]
+    ]
     
     --------------------------------------------
   , testCase "test6" $ testLabelPass ".=4 ."    
-    [ ValNop
+    [ ValSeq [ValNum 0, ValNum 0, ValNum 0, ValNum 0]
     , ValNum 4
     ]
-
+    
     --------------------------------------------
   , testCase "test7" $ testLabelPass "a=3 .=a ."    
     [ ValNop
-    , ValNop
+    , ValSeq [ValNum 0, ValNum 0, ValNum 0]
     , ValNum 3
     ]
 
@@ -57,14 +58,14 @@ testAll = testGroup "TestLabelPass.hs"
   , testCase "test8" $ testLabelPass ". myLabel: \n  myLabel"    
     [ ValNum 0
     , ValProc (Label (Ident "myLabel"))
-    , ValNum 4
+    , ValNum 1
     ]
     
     --------------------------------------------
   , testCase "test9" $ testLabelPass ". myLabel: \n  myLabel"    
     [ ValNum 0
     , ValProc (Label (Ident "myLabel"))
-    , ValNum 4
+    , ValNum 1
     ]
 
     --------------------------------------------
@@ -72,18 +73,14 @@ testAll = testGroup "TestLabelPass.hs"
     -- , testCase "test10" $ testLabelPass ". + myLabel \n myLabel:"
 
   , testIt "test11"
-    
     ". myLabel: \n  myLabel"
-    
     [ ValNum 0
     , ValProc (Label (Ident "myLabel"))
-    , ValNum 4
+    , ValNum 1
     ]
-
 
     --------------------------------------------
   , testIt "test12" 
-
     (concat [ " .              "
             , " myLabel:       "
             , " . = . + myLabel"
@@ -91,50 +88,56 @@ testAll = testGroup "TestLabelPass.hs"
            ])
     [ ValNum 0
     , ValProc (Label (Ident "myLabel"))
-    , ValNop
-    , ValNum 8
+    , ValSeq [ValNum 0]
+    , ValNum 2
     ]
-
 
     --------------------------------------------
   , testIt "test13" 
-
     (concat [ " .              "
             , " x = myLabel    "
             , " myLabel:       "
             ])
-    
      [ ValNum 0
        -- delay evaluation on this pass because myLabel isn't known.
      , ValAssn (Assn (Ident "x") (ExprTermExpr (TermIdent (Ident "myLabel")) []))
      , ValProc (Label (Ident "myLabel"))
      ] 
-    
-    
+
+    --------------------------------------------
+  , testIt "test14" 
+    (concat [ " .              "
+            , " x = myLabel    "
+            , " myLabel:       "
+            , " myLabel        "
+            ])
+    [ ValNum 0
+    , ValAssn (Assn (Ident "x") (ExprTermExpr (TermIdent (Ident "myLabel")) []))
+    , ValProc (Label (Ident "myLabel"))
+    , ValNum 1
+    ]
   ]
 
 testIt caseNum prog expect = testCase caseNum $ testLabelPass prog expect
 
-
 testLabelPass prog expect = do  
   case TP.parse (TP.many topLevel) "" prog of
     (Right tops) ->
-      do case expand expandTopLevels tops of
-           (Right (topLevels, symtab)) ->
-             case runLabelPass labelPassStmts [stmt | (TopStmt stmt) <- topLevels] of
-               Right (result, valueTable) ->
-                 if result == expect
-                 then do return () 
-                 else do putStrLn "\nFail"
-                         putStrLn prog
-                         putStrLn "\nExpected"
-                         print expect
-                         putStrLn "\nGot"
-                         print result
-                         putStrLn "\nTopLevels parsed"
-                         print tops
-                         error "test fails"
-               Left msg -> error msg
-           (Left msg) ->
-             error msg
+       case expand expandTopLevels tops of
+         (Right (topLevels, symtab)) ->
+           case runLabelPass labelPassStmts [stmt | (TopStmt stmt) <- topLevels] of
+             Right (result, valueTable) ->
+               if result == expect
+               then do return () 
+               else do putStrLn "\nFail"
+                       putStrLn prog
+                       putStrLn "\nExpected"
+                       print expect
+                       putStrLn "\nGot"
+                       print result
+                       putStrLn "\nTopLevels parsed"
+                       print tops
+                       error "test fails"
+             Left msg -> error msg
+         (Left msg) -> error msg
     (Left msg) -> error (show msg)

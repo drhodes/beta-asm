@@ -27,6 +27,7 @@ data Value = ValNum Integer
            | ValAssn Assn
            | NegVal Value
            | ValNop
+           | ValSeq [Value]
            | Delayed Binop Value Value
              deriving (Show, Eq)
 

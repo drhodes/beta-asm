@@ -3,7 +3,7 @@ build: ## build
 	echo stack build
 
 test: FORCE ## test
-	stack test --test-arguments +RTS -N -RTS '--hide-successes'
+	stack test --test-arguments +RTS -N -RTS '--hide-successes -p test'
 
 clean: FORCE ## clean all the things
 	sh clean.sh

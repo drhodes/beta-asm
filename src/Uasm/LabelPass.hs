@@ -50,7 +50,7 @@ data PlaceState = PlaceState { psCurAddr :: Integer
 psIncCurAddr :: MonadState PlaceState m => m ()
 psIncCurAddr =
   do addr <- psGetCurAddr
-     psSetCurAddr (addr + 4)
+     psSetCurAddr (addr + 1)
      return ()
 
 psSetCurAddr :: MonadState PlaceState m => Integer -> m ()
@@ -128,13 +128,19 @@ labelPassAssn assn@(Assn CurInstruction expr) =
   -- then this should fail.
   -- NB. This only holds for assignments where (.) is the LHS.
   do valTab <- psGetValueTable
+     curAddr <- psGetCurAddr
      if hasUnknown expr valTab
        then throwError $ "Unknown symbol: " ++ (show valTab)
        else do val <- eval expr
                case val of 
-                 (ValNum addr) -> psSetCurAddr addr
+                 (ValNum addr) ->
+                   if addr > curAddr
+                   then do psSetCurAddr addr
+                           return $ let numZeros = (fromIntegral $ addr - curAddr)
+                                    in ValSeq $ take numZeros (repeat (ValNum 0))
+                   else throwError $ "Can't move current instruction backwards"
+
                  x -> throwError $ "Can't assign program counter to: " ++ (show x)
-               return $ ValNop
 
 labelPassAssn assn@(Assn ident@(Ident name) expr) =               
   -- else the LHS is not (.), therefore it's okay for label
