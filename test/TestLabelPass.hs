@@ -102,8 +102,8 @@ testAll = testGroup "TestLabelPass.hs"
        -- delay evaluation on this pass because myLabel isn't known.
      , ValAssn (Assn (Ident "x") (ExprTermExpr (TermIdent (Ident "myLabel")) []))
      , ValProc (Label (Ident "myLabel"))
-     ] 
-
+     ]
+    
     --------------------------------------------
   , testIt "test14" 
     (concat [ " .              "
@@ -116,12 +116,42 @@ testAll = testGroup "TestLabelPass.hs"
     , ValProc (Label (Ident "myLabel"))
     , ValNum 1
     ]
+    
+    --------------------------------------------
+  , testIt "test15" 
+    (concat [ " .           "
+            , " x = 1+2+3   "
+            , " . = x       "
+            , " 1           "
+            ])
+
+    [ ValNum 0
+    , ValNop
+    , ValSeq [ValNum 0,ValNum 0,ValNum 0,ValNum 0,ValNum 0]
+    , ValNum 1
+    ]
+
+    --------------------------------------------
+  , testIt "test15" 
+    (concat [ " . "
+            , "x = 1+1+1+1+1+1 "
+            , " . = x       "
+            , " 1         345#$%#$%  "
+            ])
+
+    [ ValNum 0
+    , ValNop
+    , ValSeq [ValNum 0,ValNum 0,ValNum 0,ValNum 0,ValNum 0]
+    , ValNum 1
+    ]
+
+    
   ]
 
 testIt caseNum prog expect = testCase caseNum $ testLabelPass prog expect
 
 testLabelPass prog expect = do  
-  case TP.parse (TP.many topLevel) "" prog of
+  case TP.parse (TP.many topLevel <* TP.eof) "" prog of
     (Right tops) ->
        case expand expandTopLevels tops of
          (Right (topLevels, symtab)) ->

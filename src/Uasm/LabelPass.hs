@@ -204,7 +204,12 @@ instance Eval Expr where
       [ExprBinTail binop rest] -> do v1 <- (eval term)
                                      v2 <- (eval rest)
                                      opVal binop v1 v2
-      _ -> throwError "Unhandled Eval expr"
+      ((ExprBinTail binop rest):xs) -> do v1 <- (eval term)
+                                          v2 <- (eval rest)
+                                          (ValNum n) <- opVal binop v1 v2
+                                          let term' = TermLitNum (LitNum n)
+                                          eval (ExprTermExpr term' xs)
+      casex -> throwError $ "Unhandled Eval expr: " ++ (show casex)
 
   eval (ExprBinTail binop term) = throwError ("Binop Crap! " ++ (show (binop, term)))
 
