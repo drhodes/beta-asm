@@ -27,10 +27,10 @@ testAll = testGroup "TestLabelPass.hs"
     --------------------------------------------
   , testCase "test2" $ testLabelPass ". ."
     [ValNum 0, ValNum 4]
-
     --------------------------------------------
   , testCase "test3" $ testLabelPass ".\n."
     [ValNum 0, ValNum 4]
+    
 
     --------------------------------------------
   , testCase "test4" $ testLabelPass ".."
@@ -41,12 +41,80 @@ testAll = testGroup "TestLabelPass.hs"
     [ ValNop ]
     
     --------------------------------------------
-  , testCase "test5" $ testLabelPass ".=4 ."    
+  , testCase "test6" $ testLabelPass ".=4 ."    
     [ ValNop
     , ValNum 4
     ]
+
+    --------------------------------------------
+  , testCase "test7" $ testLabelPass "a=3 .=a ."    
+    [ ValNop
+    , ValNop
+    , ValNum 3
+    ]
+
+    --------------------------------------------
+  , testCase "test8" $ testLabelPass ". myLabel: \n  myLabel"    
+    [ ValNum 0
+    , ValProc (Label (Ident "myLabel"))
+    , ValNum 4
+    ]
+    
+    --------------------------------------------
+  , testCase "test9" $ testLabelPass ". myLabel: \n  myLabel"    
+    [ ValNum 0
+    , ValProc (Label (Ident "myLabel"))
+    , ValNum 4
+    ]
+
+    --------------------------------------------
+    -- planned error
+    -- , testCase "test10" $ testLabelPass ". + myLabel \n myLabel:"
+
+  , testIt "test11"
+    
+    ". myLabel: \n  myLabel"
+    
+    [ ValNum 0
+    , ValProc (Label (Ident "myLabel"))
+    , ValNum 4
+    ]
+
+
+    --------------------------------------------
+  , testIt "test12" 
+
+    (concat [ " .              "
+            , " myLabel:       "
+            , " . = . + myLabel"
+            , " .              "
+           ])
+    [ ValNum 0
+    , ValProc (Label (Ident "myLabel"))
+    , ValNop
+    , ValNum 8
+    ]
+
+
+    --------------------------------------------
+  , testIt "test13" 
+
+    (concat [ " .              "
+            , " x = myLabel    "
+            , " myLabel:       "
+            ])
+    
+     [ ValNum 0
+       -- delay evaluation on this pass because myLabel isn't known.
+     , ValAssn (Assn (Ident "x") (ExprTermExpr (TermIdent (Ident "myLabel")) []))
+     , ValProc (Label (Ident "myLabel"))
+     ] 
+    
     
   ]
+
+testIt caseNum prog expect = testCase caseNum $ testLabelPass prog expect
+
 
 testLabelPass prog expect = do  
   case TP.parse (TP.many topLevel) "" prog of

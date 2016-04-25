@@ -107,7 +107,7 @@ expandTerm term@(TermIdent ident) =
        else do expr <- SymTab.mLookup k
                case expr of
                  Just expr -> return $ TermExpr expr
-                 Nothing -> throwError $ "Couldn't find term: " ++ (show ident)
+                 Nothing -> return term --throwError $ "Couldn't find term: " ++ (show ident)
 
 expandTerm (TermExpr expr) = TermExpr <$> expandExpr expr
 expandTerm (TermNeg term) = TermNeg <$> expandTerm term

@@ -37,7 +37,6 @@ that point.
 ---------------------------------
 
 The value table contains 
-
 -}
 
 -- move this into Uasm.PlaceState or something.
@@ -96,7 +95,6 @@ runExceptStateT s = runExceptT . flip runStateT s
 
 runLabelPass func node = runIdentity . runExceptStateT (newPlaceState) $ func node
 
-
 --------------------------------------------
 labelPassStmts stmts = mapM labelPassStmt stmts
 
@@ -108,12 +106,9 @@ labelPassStmt (StmtCall call) = throwError $
 
 labelPassStmt (StmtAssn assn) = labelPassAssn assn
 labelPassStmt (StmtExpr expr) =
-  do vt <- psGetValueTable
-     if hasUnknown expr vt
-       then do x <- eval expr
-               psIncCurAddr
-               return x
-       else labelPassExpr expr
+  do x <- eval expr
+     psIncCurAddr
+     return x
             
 labelPassStmt (StmtMany _) = throwError $
   "label pass shouldn't handle StmtMany. \
@@ -122,10 +117,10 @@ labelPassStmt (StmtMany _) = throwError $
 
 labelPassProc :: Proc -> LabelPass Value
 
-labelPassProc (Label name) = 
+labelPassProc lbl@(Label name) = 
   do addr <- psGetCurAddr
-     psInsertValue name (ValNum addr)
-     return $ ValProc (Label name)
+     psInsertValue name (ValNum addr)     
+     return $ ValProc lbl
      
 labelPassAssn assn@(Assn CurInstruction expr) =
   -- try to eval expr, this might not work because expr might contain
@@ -134,7 +129,7 @@ labelPassAssn assn@(Assn CurInstruction expr) =
   -- NB. This only holds for assignments where (.) is the LHS.
   do valTab <- psGetValueTable
      if hasUnknown expr valTab
-       then throwError "Unknown symbol"
+       then throwError $ "Unknown symbol: " ++ (show valTab)
        else do val <- eval expr
                case val of 
                  (ValNum addr) -> psSetCurAddr addr
@@ -148,7 +143,10 @@ labelPassAssn assn@(Assn ident@(Ident name) expr) =
   -- determined in the next pass.
   do v <- eval expr
      psInsertValue ident v
-     return $ ValAssn assn
+     valTab <- psGetValueTable     
+     return $ if hasUnknown expr valTab
+              then ValAssn assn
+              else ValNop
 
 labelPassExpr :: Expr -> LabelPass Value       
 labelPassExpr expr = eval expr
@@ -166,13 +164,27 @@ instance HasUnknown Expr where
   hasUnknown (ExprBinTail binop term) vt = hasUnknown term vt
 
 instance HasUnknown Term where  
+  hasUnknown (TermIdent CurInstruction) _ = False
   hasUnknown (TermIdent ident) vt = not $ DM.member ident vt
   hasUnknown (TermNeg term) vt = hasUnknown term vt
   hasUnknown (TermExpr expr) vt = hasUnknown expr vt
-  hasUnknown (TermLitNum _) vt = False
+  hasUnknown (TermLitNum _) _ = False
 
 ------------------------------------------------------------------
 -- eval 
+
+opApply :: Binop -> Integer -> Integer -> LabelPass Value
+opApply op x y =
+  let f = case op of
+        Addition -> (+)
+        Subtract -> (-)
+        Multiply -> (*)
+        z -> error $ "Need to implement: " ++ (show z) ++ " for opApply in Eval"
+  in return $ ValNum (f x y)
+
+opVal bop (ValNum x) (ValNum y) = opApply bop x y
+opVal bop x y = return $ Delayed bop x y
+
 
 class Eval a where
   eval :: a -> LabelPass Value
@@ -181,7 +193,13 @@ instance Eval Expr where
   eval (ExprNeg expr) = eval expr
   eval (ExprTerm term) = eval term
   eval (ExprTermExpr term []) = eval term
-  eval (ExprTermExpr term exprs) = throwError ("Crap! " ++ (show exprs))
+  eval (ExprTermExpr term exprs) = 
+    case exprs of
+      [ExprBinTail binop rest] -> do v1 <- (eval term)
+                                     v2 <- (eval rest)
+                                     opVal binop v1 v2
+      _ -> throwError "Unhandled Eval expr"
+
   eval (ExprBinTail binop term) = throwError ("Binop Crap! " ++ (show (binop, term)))
 
 instance Eval Term where
@@ -190,7 +208,7 @@ instance Eval Term where
     do found <- psLookupVal ident
        case found of
          Just val -> return val
-         Nothing -> throwError $ "Couldn't find symbol: " ++ (show ident)
+         Nothing -> return $ ValIdent ident
                                 
   eval (TermNeg term) = NegVal <$> eval term
   eval (TermExpr expr) = eval expr
