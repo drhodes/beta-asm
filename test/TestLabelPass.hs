@@ -27,6 +27,7 @@ testAll = testGroup "TestLabelPass.hs"
     --------------------------------------------
   , testCase "test2" $ testLabelPass ". ."
     [ValNum 0, ValNum 1]
+    
     --------------------------------------------
   , testCase "test3" $ testLabelPass ".\n."
     [ValNum 0, ValNum 1]
@@ -81,7 +82,7 @@ testAll = testGroup "TestLabelPass.hs"
 
     --------------------------------------------
   , testIt "test12" 
-    (concat [ " .              "
+    (unlines [ " .              "
             , " myLabel:       "
             , " . = . + myLabel"
             , " .              "
@@ -94,7 +95,7 @@ testAll = testGroup "TestLabelPass.hs"
 
     --------------------------------------------
   , testIt "test13" 
-    (concat [ " .              "
+    (unlines [ " .              "
             , " x = myLabel    "
             , " myLabel:       "
             ])
@@ -106,7 +107,7 @@ testAll = testGroup "TestLabelPass.hs"
     
     --------------------------------------------
   , testIt "test14" 
-    (concat [ " .              "
+    (unlines [ " .              "
             , " x = myLabel    "
             , " myLabel:       "
             , " myLabel        "
@@ -119,12 +120,11 @@ testAll = testGroup "TestLabelPass.hs"
     
     --------------------------------------------
   , testIt "test15" 
-    (concat [ " .           "
+    (unlines [ " .           "
             , " x = 1+2+3   "
             , " . = x       "
             , " 1           "
             ])
-
     [ ValNum 0
     , ValNop
     , ValSeq [ValNum 0,ValNum 0,ValNum 0,ValNum 0,ValNum 0]
@@ -132,21 +132,129 @@ testAll = testGroup "TestLabelPass.hs"
     ]
 
     --------------------------------------------
-  , testIt "test15" 
-    (concat [ " . "
-            , "x = 1+1+1+1+1+1 "
-            , " . = x       "
-            , " 1         345#$%#$%  "
-            ])
-
+  , testIt "test16" 
+    (unlines [ " .               "
+             , " x = 1+1+1+1+1+1 "
+             , " . = x           "
+             , " 1               "
+             ])
     [ ValNum 0
     , ValNop
     , ValSeq [ValNum 0,ValNum 0,ValNum 0,ValNum 0,ValNum 0]
     , ValNum 1
     ]
 
+    --------------------------------------------
+  , testIt "test17" 
+    (unlines [ " .               "
+             , " x = 1+1+1+1+1+1 "
+             , " . = x           "
+             , " 1               "
+             ])
+    [ ValNum 0
+    , ValNop
+    , ValSeq [ValNum 0,ValNum 0,ValNum 0,ValNum 0,ValNum 0]
+    , ValNum 1
+    ]
+
+    --------------------------------------------
+  , testIt "test18" 
+    (unlines [ "."
+             , ".macro Add(x, y) { x + y }"
+             , "Add(1,-1)"
+             , "."
+             ])
+    [ ValNum 0
+    , ValNum 0
+    , ValNum 2
+    ]
+
+    -- recursive call to JMP infinite loop
+    --   --------------------------------------------
+    -- , testIt "test19" 
+    --   (unlines [ "."
+    --            , ".macro JMP(lbl) { JMP(lbl) }"
+    --            , "JMP(myLabel)" 
+    --            , "myLabel:"
+    --            , "."
+    --            ])
+    --   [ ValNum 0
+    --   ]
+    --------------------------------------------
+
+    --------------------------------------------
+  , testIt "test20"
+      (unlines [ "."
+               , ".macro WORD(x) x%0x100 (x>>8)%0x100"
+               , "WORD(0xFFFF)"
+               ])
+      [ ValNum 0 , ValNum 255 , ValNum 255 ]
+
+  , testIt "test21"
+      (unlines [ "."
+               , ".macro WORD(x) x%0x100 (x>>8)%0x100"
+               , "WORD(0xFFFFFFFF)"
+               ])
+      [ ValNum 0 , ValNum 255 , ValNum 255 ]
+
+  , testIt "test22"
+      (unlines [ "."
+               , ".macro WORD(x) x%0x100 (x>>8)%0x100"
+               , ".macro LONG(x) WORD(x) WORD(x >> 16)"
+               , "LONG(0xDEADBEEF)"
+               ])
+      [ ValNum 0 
+      , ValNum 0xEF, ValNum 0xBE, ValNum 0xAD, ValNum 0xDE
+      ]
+
+      -- this needs to be handled in FinalPass, because of the forward label.
+      --------------------------------------------
+      -- , testIt "test23"
+      --   (unlines [ "."
+      --            , "r31 = 31"
+      --            , ".macro WORD(x) x%0x100 (x>>8)%0x100"
+      --            , ".macro LONG(x) WORD(x) WORD(x >> 16)"
+      --            , ".macro betaopc(OP,RA,CC,RC) {"
+      --            , "   .align 4"
+      --            , "   LONG((OP<<26)+((RC%0x20)<<21)+((RA%0x20)<<16)+(CC%0x10000)) }"
+      --            , ".macro BETABR(OP,RA,RC,LABEL)   betaopc(OP,RA,((LABEL-.)>>2)-1, RC)"
+      --            , ".macro BEQ(RA, LABEL, RC)       BETABR(0x1C,RA,RC,LABEL)"
+      --            , ".macro BR(LABEL,RC)             BEQ(r31, LABEL, RC)"
+      --            , ".macro BR(LABEL) BR(LABEL, r31)"
+      --            , "BR(LABEL)"
+      --            , "LABEL:"
+      --            , "."
+      --            ])
+      --   [ ValNum 0
+      --   , ValNum 0
+      --   , ValNum 2
+      --   ]
     
   ]
+
+
+testProc = testGroup "TestLabelPass.hs Procs"
+  [
+    --------------------------------------------
+    testCase "test1" $ testLabelPass
+    (unlines [ "1 2"
+             , ".align 4"
+             , "3"
+             ])
+    [ ValNum 1
+    , ValNum 2
+    , ValSeq [ValNum 0, ValNum 0]
+    , ValNum 3
+    ]
+    
+  ] -- eof of testProc
+
+
+--------------------------------------------
+    
+testFile fname expect = do
+  prog <- readFile $ "test/uasm/" ++ fname
+  defaultMain $ testIt fname (eraseComments prog) expect
 
 testIt caseNum prog expect = testCase caseNum $ testLabelPass prog expect
 
@@ -155,18 +263,19 @@ testLabelPass prog expect = do
     (Right tops) ->
        case expand expandTopLevels tops of
          (Right (topLevels, symtab)) ->
-           case runLabelPass labelPassStmts [stmt | (TopStmt stmt) <- topLevels] of
+           case runLabelPass labelPassStmts (flattenTops topLevels) of
              Right (result, valueTable) ->
                if result == expect
                then do return () 
-               else do putStrLn "\nFail"
-                       putStrLn prog
+               else do let trunc x = putStrLn $ take 2000 $ show x
+                       putStrLn "\nFail"
+                       trunc  prog
                        putStrLn "\nExpected"
-                       print expect
+                       trunc expect
                        putStrLn "\nGot"
-                       print result
+                       trunc result
                        putStrLn "\nTopLevels parsed"
-                       print tops
+                       trunc tops
                        error "test fails"
              Left msg -> error msg
          (Left msg) -> error msg

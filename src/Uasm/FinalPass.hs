@@ -1,7 +1,7 @@
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
-module Uasm.LabelPass where
+module Uasm.FinalPass where
 
 import           Control.Monad
 import           Control.Monad.State
@@ -21,19 +21,8 @@ import Data.Functor.Identity
 import qualified Text.PrettyPrint.Leijen as PP
 
 {-
-Macros have been expanded.  Label addresses are unknown because
-expressions havn't been evaluated. Current address identifiers (.)
-can be determined, but only if they don't share an expression with a
-label that has yet to be encountered. 
 
-When a label declaration is encountered, then it's value is known,
-however, if a label string is encountered, such as in the call of BEQ,
-then the label value may not yet be known, therefore, evaluation of
-these labels is not yet possible in all cases.  Evaluation is only
-possible for an expression if it does not contain undeclared labels,
-at least for this pass.  The next pass, the eval pass will enjoy the
-symbol table from this pass, so all label positions will be known at
-that point.
+This is the final pass
 ---------------------------------
 
 The value table contains 
@@ -41,50 +30,9 @@ The value table contains
 
 -- move this into Uasm.PlaceState or something.
 
-type ValueTable = DM.Map Ident Value
-
-data PlaceState = PlaceState { psCurAddr :: Integer
-                             , psValueTable :: ValueTable
-                             } deriving (Show, Eq)
-
-psIncCurAddr :: MonadState PlaceState m => m ()
-psIncCurAddr =
-  do addr <- psGetCurAddr
-     psSetCurAddr (addr + 1)
-     return ()
-
-psSetCurAddr :: MonadState PlaceState m => Integer -> m ()
-psSetCurAddr n =
-  do ps@(PlaceState _ _) <- get
-     put ps{psCurAddr = n}
-     return ()
-
-psGetCurAddr :: MonadState PlaceState m => m Integer
-psGetCurAddr =
-  do (PlaceState addr _) <- get
-     return addr
-
-psGetValueTable :: MonadState PlaceState m => m ValueTable
-psGetValueTable =
-  do (PlaceState _ vt) <- get
-     return vt
-       
-psInsertValue key val =
-  do ps@(PlaceState _ table) <- get
-     let table' = DM.insert key val table
-     psIncCurAddr
-     addr <- psGetCurAddr
-     put ps{psValueTable = table'}
-     return ()
-
-psLookupVal name =
-  do vt <- psGetValueTable
-     return $ DM.lookup name vt
-
-newPlaceState = PlaceState 0 DM.empty
 ------------------------------------------------------------------
 
-type LabelPass b = forall m. ( MonadState PlaceState m,
+type FinalPass b = forall m. ( MonadState PlaceState m,
                                MonadError String m ) => m b
 
 runStateExceptT :: s -> ExceptT e (StateT s m) a -> m (Either e a, s)
@@ -93,36 +41,36 @@ runStateExceptT s = flip runStateT s . runExceptT
 runExceptStateT :: s -> StateT s (ExceptT e m) a -> m (Either e (a, s))
 runExceptStateT s = runExceptT . flip runStateT s
 
-runLabelPass func node = runIdentity . runExceptStateT (newPlaceState) $ func node
+runFinalPass func node = runIdentity . runExceptStateT (newPlaceState) $ func node
 
 --------------------------------------------
-labelPassStmts stmts = mapM labelPassStmt stmts
+finalPassStmts stmts = mapM finalPassStmt stmts
 
-labelPassStmt :: Stmt -> LabelPass Value
-labelPassStmt (StmtProc p) = labelPassProc p
-labelPassStmt (StmtCall call) = throwError $
-  "labelPassStmt shouldn't handle any macro calls, \ 
+finalPassStmt :: Stmt -> FinalPass Value
+finalPassStmt (StmtProc p) = finalPassProc p
+finalPassStmt (StmtCall call) = throwError $
+  "finalPassStmt shouldn't handle any macro calls, \ 
   \they should have been flattened alreadu in Uasm.Expand"
 
-labelPassStmt (StmtAssn assn) = labelPassAssn assn
-labelPassStmt (StmtExpr expr) =
+finalPassStmt (StmtAssn assn) = finalPassAssn assn
+finalPassStmt (StmtExpr expr) =
   do x <- eval expr
      psIncCurAddr
      return x
             
-labelPassStmt (StmtMany _) = throwError $
+finalPassStmt (StmtMany _) = throwError $
   "label pass shouldn't handle StmtMany. \
   \StmtMany should have already been \
   \flattened out in Uasm.Expand.flattenStmt"
 
-labelPassProc :: Proc -> LabelPass Value
+finalPassProc :: Proc -> FinalPass Value
 
-labelPassProc lbl@(Label name) = 
+finalPassProc lbl@(Label name) = 
   do addr <- psGetCurAddr
      psInsertValue name (ValNum addr)     
      return $ ValProc lbl
 
-labelPassProc (DotAlign expr) =
+finalPassProc (DotAlign expr) =
   do addr <- psGetCurAddr
      val <- eval expr
      case val of
@@ -131,11 +79,8 @@ labelPassProc (DotAlign expr) =
                    else let padLen = fromIntegral $ n - ((addr + n) `mod` n)
                         in return $ ValSeq (take padLen $ repeat (ValNum 0))
        _ -> throwError $ "Couldn't evaluate expression in a .align: " ++ (show expr)
-
-
-
      
-labelPassAssn assn@(Assn CurInstruction expr) =
+finalPassAssn assn@(Assn CurInstruction expr) =
   -- try to eval expr, this might not work because expr might contain
   -- a label that has yet to be encountered, and if that's the case,
   -- then this should fail.
@@ -155,7 +100,7 @@ labelPassAssn assn@(Assn CurInstruction expr) =
 
                  x -> throwError $ "Can't assign program counter to: " ++ (show x)
 
-labelPassAssn assn@(Assn ident@(Ident name) expr) =               
+finalPassAssn assn@(Assn ident@(Ident name) expr) =               
   -- else the LHS is not (.), therefore it's okay for label
   -- identifiers found in expressions to delay evaluation, this is
   -- necessary to have BR(label) work.  Any such labels will be
@@ -167,8 +112,8 @@ labelPassAssn assn@(Assn ident@(Ident name) expr) =
               then ValAssn assn
               else ValNop
 
-labelPassExpr :: Expr -> LabelPass Value       
-labelPassExpr expr = eval expr
+finalPassExpr :: Expr -> FinalPass Value       
+finalPassExpr expr = eval expr
 
 class HasUnknown a where
   hasUnknown :: a -> ValueTable -> Bool
@@ -192,7 +137,7 @@ instance HasUnknown Term where
 ------------------------------------------------------------------
 -- eval 
 
-opApply :: Binop -> Integer -> Integer -> LabelPass Value
+opApply :: Binop -> Integer -> Integer -> FinalPass Value
 opApply op x y =
   let f = case op of
         Addition -> (+)
@@ -203,7 +148,7 @@ opApply op x y =
                       in f'
         LeftShift -> let f' x' y' = DB.shiftL (fromIntegral x') (fromIntegral y')
                      in f'
-        z -> error $ "Need to implement: " ++ (show z) ++ " for opApply in LabelPass"
+        z -> error $ "Need to implement: " ++ (show z) ++ " for opApply in FinalPass"
   in return $ ValNum (f x y)
 
 opVal bop (ValNum x) (ValNum y) = opApply bop x y
@@ -211,7 +156,7 @@ opVal bop x y = return $ Delayed bop x y
 
 
 class Eval a where
-  eval :: a -> LabelPass Value
+  eval :: a -> FinalPass Value
 
 negative (ValNum n) = ValNum (-n)
 negative x = NegVal x
