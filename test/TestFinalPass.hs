@@ -74,6 +74,7 @@ testAll = testGroup "TestLabelPass.hs"
     , ValNum 3
     ]
 
+    --------------------------------------------
     , testIt "test4"
       (unlines [ "LABEL:"
                , "1"
@@ -100,6 +101,17 @@ testAll = testGroup "TestLabelPass.hs"
       , ValNum 0x73
       , ValNum 0x08
       ]
+
+    --------------------------------------------
+    , testIt "test5"
+      (unlines [ "."
+               , "myLabel:"
+               , "."
+               , "myLabel"
+               , "."
+               ])
+      [ ValNum 0, ValNum 1, ValNum 1, ValNum 3 ]
+      
     ]
   
 --------------------------------------------
