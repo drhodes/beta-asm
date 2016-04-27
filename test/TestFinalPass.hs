@@ -34,36 +34,8 @@ testAll = testGroup "TestLabelPass.hs"
     , ValNum 2
     ]
     
-    -- --------------------------------------------
-    -- , testIt "test2"
-    -- (unlines [ "."
-    --          , "r31 = 31"
-    --          , ".macro WORD(x) x%0x100 (x>>8)%0x100"
-    --          , ".macro LONG(x) WORD(x) WORD(x >> 16)"
-    --          , ".macro betaopc(OP,RA,CC,RC) {"
-    --          , "   .align 4"
-    --          , "   LONG((OP<<26)+((RC%0x20)<<21)+((RA%0x20)<<16)+(CC%0x10000)) }"
-    --          , ".macro BETABR(OP,RA,RC,LABEL)   betaopc(OP,RA,((LABEL-.)>>2)-1, RC)"
-    --          , ".macro BEQ(RA, LABEL, RC)       BETABR(0x1C,RA,RC,LABEL)"
-    --          , ".macro BR(LABEL,RC)             BEQ(r31, LABEL, RC)"
-    --          , ".macro BR(LABEL) BR(LABEL, r31)"
-    --          , "BR(LABEL)"
-    --          , "LABEL:"
-    --          , "."
-    --          ])
-    -- [ ValNum 0
-    -- , ValNum 0
-    -- , ValNum 0
-    -- , ValNum 0
-    -- , ValNum 0
-    -- , ValNum 0
-    -- , ValNum 0xff
-    -- , ValNum 0x73
-    -- , ValNum 0x8
-    -- ]
-
     --------------------------------------------
-    , testIt "test3"
+    , testIt "test2"
     (unlines [ "LABEL:"
              , "."
              , "r31 = 31"
@@ -89,8 +61,47 @@ testAll = testGroup "TestLabelPass.hs"
     ]
 
     
-  ]
+    --------------------------------------------
+    , testIt "test3"
+    (unlines [ "1"
+             , ".align 4"
+             , "2"
+             , ".align 4"
+             , "3"
+             ])
+    [ ValNum 1, ValNum 0, ValNum 0, ValNum 0
+    , ValNum 2, ValNum 0, ValNum 0, ValNum 0
+    , ValNum 3
+    ]
 
+    , testIt "test4"
+      (unlines [ "LABEL:"
+               , "1"
+               , "r31 = 31"
+               , ".macro WORD(x) x%0x100 (x>>8)%0x100"
+               , ".macro LONG(x) WORD(x) WORD(x >> 16)"
+               , ".macro betaopc(OP,RA,CC,RC) {"
+               , ".align 4"
+               , "LONG((OP<<26)+((RC%0x20)<<21)+((RA%0x20)<<16)+(CC%0x10000)) }"
+               , ".macro BETABR(OP,RA,RC,LABEL)   betaopc(OP,RA,((LABEL-.)>>2)-1, RC)"
+               , ".macro BEQ(RA, LABEL, RC)       BETABR(0x1C,RA,RC,LABEL)"
+               , ".macro BR(LABEL,RC)             BEQ(r31, LABEL, RC)"
+               , ".macro BR(LABEL) BR(LABEL, r31)"
+               , "BR(LABEL)"
+               , "."
+               ])
+      [ ValNum 1
+      , ValNum 0
+      , ValNum 0
+      , ValNum 0
+      , ValNum 0xfe
+      , ValNum 0xff 
+      , ValNum 0xff
+      , ValNum 0x73
+      , ValNum 0x08
+      ]
+    ]
+  
 --------------------------------------------
 testFile fname expect = do
   prog <- readFile $ "test/uasm/" ++ fname
@@ -132,17 +143,3 @@ doLabelPass prog = do
          (Left msg) -> error msg
     (Left msg) -> error (show msg)
 
--- LABEL:
--- .
--- r31 = 31
--- .macro WORD(x) x%0x100 (x>>8)%0x100
--- .macro LONG(x) WORD(x) WORD(x >> 16)
--- .macro betaopc(OP,RA,CC,RC) {
--- .align 4
--- LONG((OP<<26)+((RC%0x20)<<21)+((RA%0x20)<<16)+(CC%0x10000)) }
--- .macro BETABR(OP,RA,RC,LABEL)   betaopc(OP,RA,((LABEL-.)>>2)-1, RC)
--- .macro BEQ(RA, LABEL, RC)       BETABR(0x1C,RA,RC,LABEL)
--- .macro BR(LABEL,RC)             BEQ(r31, LABEL, RC)
--- .macro BR(LABEL) BR(LABEL, r31)
--- BR(LABEL)
--- .

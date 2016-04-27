@@ -128,8 +128,9 @@ labelPassProc (DotAlign expr) =
      case val of
        ValNum n -> if addr `mod` n == 0
                    then return ValNop
-                   else let padLen = fromIntegral $ n - ((addr + n) `mod` n)
-                        in return $ ValSeq (take padLen $ repeat (ValNum 0))
+                   else do let padLen = fromIntegral $ n - ((addr + n) `mod` n)
+                           replicateM_ padLen psIncCurAddr
+                           return $ ValSeq (take padLen $ repeat (ValNum 0))
        _ -> throwError $ "Couldn't evaluate expression in a .align: " ++ (show expr)
 
 
