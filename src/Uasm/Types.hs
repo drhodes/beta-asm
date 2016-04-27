@@ -4,6 +4,7 @@
 module Uasm.Types where
 
 import qualified Data.Map as DM
+import qualified Data.Word as DW
 
 data SymbolTable = SymTab { symTabCurScope :: DM.Map SymbolKey Expr
                           , symTabCurMacroScope :: DM.Map SymbolKey Macro
@@ -29,27 +30,33 @@ data Value = ValNum Integer
            | ValNop
            | ValSeq [Value]
            | Delayed Binop Value Value
-             deriving (Show, Eq)
+             deriving (Show, Eq, Ord)
 
 -- class Eval a where
 --   eval :: a -> SymbolTable -> Either String Value
 
 data TopLevel = TopStmt Stmt
               | TopMacro Macro
-                deriving (Show, Eq)
+                deriving (Show, Eq, Ord)
 
 data Stmt = StmtProc Proc
           | StmtCall Call
           | StmtAssn Assn
           | StmtExpr Expr
           | StmtMany [Stmt]
-          deriving (Show, Eq)
+          deriving (Show, Eq, Ord)
 
-data Macro = Macro Ident [Ident] [Stmt] deriving (Show, Eq)
+data Macro = Macro Ident [Ident] [Stmt] deriving (Show, Eq, Ord)
 
-data Assn = Assn Ident Expr deriving (Show, Eq)
+data Addr = Addr Integer deriving (Show, Eq, Ord)
 
-data Call = Call Ident [Expr] deriving (Show, Eq)
+data Assn = Assn Ident Expr deriving (Show, Eq, Ord)
+
+data Call = Call Ident [Expr] deriving (Show, Eq, Ord)
+
+
+data PlacedByte = PlacedByte Addr DW.Word8
+
 
 data Proc = DotInclude String
           | DotAlign Expr
@@ -60,7 +67,7 @@ data Proc = DotInclude String
           | DotUnprotect
           | DotOptions
           | Label Ident
-            deriving (Show, Eq)
+            deriving (Show, Eq, Ord)
 
 data Binop = BitwiseComplement
            | BitwiseAnd
@@ -72,25 +79,25 @@ data Binop = BitwiseComplement
            | Modulo
            | RightShift
            | LeftShift
-             deriving (Show, Eq)
+             deriving (Show, Eq, Ord)
 
 data Expr = ExprNeg Expr
           | ExprTerm Term
           | ExprTermExpr Term [Expr]
           | ExprBinTail Binop Term
-            deriving (Show, Eq)
+            deriving (Show, Eq, Ord)
                      
 data Term = TermIdent Ident
           | TermLitNum LitNum
           | TermNeg Term
           | TermExpr Expr
-            deriving (Show, Eq)
+            deriving (Show, Eq, Ord)
 
 data Ident = Ident String
            | CurInstruction
            | PlacedInstruction Integer
              deriving (Show, Eq, Ord)
 
-data LitNum = LitNum Integer deriving (Show, Eq)
+data LitNum = LitNum Integer deriving (Show, Eq, Ord)
 
 

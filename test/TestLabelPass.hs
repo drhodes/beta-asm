@@ -74,7 +74,7 @@ testAll = testGroup "TestLabelPass.hs"
     -- , testCase "test10" $ testLabelPass ". + myLabel \n myLabel:"
 
   , testIt "test11"
-    ". myLabel: \n  myLabel"
+    ". \n myLabel: \n  myLabel"
     [ ValNum 0
     , ValProc (Label (Ident "myLabel"))
     , ValNum 1
@@ -92,7 +92,7 @@ testAll = testGroup "TestLabelPass.hs"
     , ValSeq [ValNum 0]
     , ValNum 2
     ]
-
+    
     --------------------------------------------
   , testIt "test13" 
     (unlines [ " .              "
@@ -258,6 +258,7 @@ testFile fname expect = do
 
 testIt caseNum prog expect = testCase caseNum $ testLabelPass prog expect
 
+testLabelPass :: String -> [Value] -> IO ()
 testLabelPass prog expect = do  
   case TP.parse (TP.many topLevel <* TP.eof) "" prog of
     (Right tops) ->

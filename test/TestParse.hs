@@ -6,6 +6,7 @@ import           Uasm.Types
 import qualified Text.Parsec as TP
 import qualified TestExpand as TE
 import qualified TestLabelPass as TLP
+import qualified TestFinalPass as TFP
 import qualified TestBind as TB
 import           Text.Parsec.Error
 import           Text.Parsec.String
@@ -25,6 +26,7 @@ tests :: TestTree
 tests = testGroup "Tests" [ parseTests
                           , TE.testAll
                           , TLP.testAll
+                          , TFP.testAll
                           , TB.tests
                           -- , TFD.assigns
                           ]

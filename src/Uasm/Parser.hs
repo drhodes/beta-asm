@@ -338,7 +338,7 @@ topLevel2 = do spaces
                spaces
                return (TopMacro m)
 
-sourceFile = many topLevel
+sourceFile = many topLevel <* eof
 
 
   

@@ -3,7 +3,7 @@ build: ## build
 	echo stack build
 
 test: FORCE ## test
-	stack test --ghc-options -O0 --test-arguments +RTS -N -RTS '--hide-successes'
+	stack test --ghc-options -fprof-auto --test-arguments +RTS -N -RTS '--hide-successes'
 
 clean: FORCE ## clean all the things
 	sh clean.sh
