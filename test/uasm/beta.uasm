@@ -430,5 +430,5 @@ PC_MASK            = 0x7fffffff         // a mask for the rest of the PC
 }
 
 // Macro to reserve N consecutive WORDS of memory:
-.macro RESERVE(N) . = .+(N*4)
+.macro RESERVE(N)  . = .+(N*4) 
 

@@ -18,8 +18,6 @@ import           Control.Monad
 import           Test.Tasty
 import           Test.Tasty.HUnit
 
-import           GHC.Stack
-
 unitTests = testGroup "Unit tests"
 testAll = testGroup "TestLabelPass.hs"
   [ --------------------------------------------
@@ -111,41 +109,57 @@ testAll = testGroup "TestLabelPass.hs"
                , "."
                ])
       [ ValNum 0, ValNum 1, ValNum 1, ValNum 3 ]
+
+
+    --------------------------------------------
+    , testIt "test5"
+      (unlines [ ".macro M1(n) { . = n + 4 }"
+               , "M1(0)"
+               ])
+      [ ValNum 0, ValNum 0, ValNum 0, ValNum 0 ]
+      
+    , testCaseBeta "reserve1.uasm" [ValNum 1]
+    , testCaseBeta "reserve2.uasm" [ValNum 0, ValNum 0,ValNum 0,ValNum 0]
       
     ]
   
 --------------------------------------------
-testFile fname expect = do
-  prog <- readFile $ "test/uasm/" ++ fname
-  defaultMain $ testIt fname (eraseComments prog) expect
+testFile fname expect =
+  do prog <- readFile $ "test/uasm/" ++ fname
+     defaultMain $ testIt fname (eraseComments prog) expect
 
--- testIt caseNum prog expect = testCase caseNum $ testLabelPass prog expect
+testCaseBeta fname expect = testCase fname $ testFileWithBeta fname expect
+
+testFileWithBeta fname expect =
+  do beta <- readFile "test/uasm/beta.uasm"
+     prog <- readFile $ "test/uasm/" ++ fname
+     testFinalPass (eraseComments (beta ++ "\n" ++ prog)) expect
 
 testIt caseNum prog expect =
   testCase caseNum $ testFinalPass prog expect
      
+testFinalPass :: String -> [Value] -> IO ()
 testFinalPass prog expect = 
   do labelPassResult <- doLabelPass prog
      case labelPassResult of
        (Right (vals, placeState)) ->
          case runFinalPass vals of
            Right result ->
-             if expect == result
-             then return ()
-             else do let trunc x = putStrLn $ take 2000 $ show x
-                     putStrLn "\nFail"
-                     trunc  prog
-                     putStrLn "\nExpected"
-                     trunc expect
-                     putStrLn "\nGot"
-                     trunc result
-                     putStrLn "\nLabelPass"
-                     trunc vals
-                     error "test fails"
+             unless (expect == result) $
+               do let trunc x = putStrLn $ take 2000 $ show x
+                  putStrLn "\nFail"
+                  trunc  prog
+                  putStrLn "\nExpected"
+                  trunc expect
+                  putStrLn "\nGot"
+                  trunc result
+                  putStrLn "\nLabelPass"
+                  trunc vals
+                  error "test fails"
            Left msg -> error msg
        (Left msg) -> error msg
 
-doLabelPass :: Monad m => String -> m (Either [Char] ([Value], PlaceState))
+doLabelPass :: Monad m => String -> m (Either String ([Value], PlaceState))
 doLabelPass prog = do  
   case TP.parse (TP.many topLevel <* TP.eof) "" prog of
     (Right tops) ->

@@ -84,6 +84,9 @@ bindMacro exprs (Macro name args stmts) =
      -- push the new symbol table to give priority to argument
      -- identifiers.
      put (SymTab ids macs curScope)
+
+     -- st <- get
+     -- throwError $ show st
      
      -- throwError $ show (SymTab ids macs curScope)
      -- expand statments defined by the macro
@@ -95,7 +98,7 @@ bindMacro exprs (Macro name args stmts) =
 expandAssn assn@(Assn ident expr) =
   do let k = KeyIdent ident
      if ident == CurInstruction          
-       then return assn
+       then do Assn ident <$> expandExpr expr
        else do SymTab.mInsert k expr
                return assn
 

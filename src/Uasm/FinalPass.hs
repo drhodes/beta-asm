@@ -38,7 +38,7 @@ eval the delayed expressions.
 The value table contains
 -}
 
-type LabelMap = DM.Map Value Addr
+type LabelMap = DM.Map Ident Addr
 
 type FinalPass b = forall m. ( MonadState LabelMap m,
                                MonadError String m ) => m b
@@ -57,7 +57,7 @@ insertLabel key val =
   do table <- get
      put $ DM.insert key val table
 
-lookupAddr :: Value -> FinalPass (Maybe Addr)
+lookupAddr :: Ident -> FinalPass (Maybe Addr)
 lookupAddr name =
   do table <- get
      return $ DM.lookup name table
@@ -72,6 +72,7 @@ flattenVals [] = []
 flattenVals ((ValSeq xs):rest) = flattenVals $ xs ++ rest
 flattenVals (x:xs) = x : (flattenVals xs)
 
+identOfLabel (ValProc (Label name)) = name
 
 notLabel = not . isLabel
 
@@ -90,7 +91,7 @@ finalPass vals =
         -- pickout the labels with their byte addreses
         placedLabels = filter (isLabel . fst) placedBytes
         -- create a lookup table for labels and their byte addresses
-        labelMap = DM.fromList placedLabels
+        labelMap = DM.fromList [(identOfLabel lbl, idx) | (lbl, idx) <-  placedLabels]
 
     put labelMap
     -- throwError $ show flatVals
@@ -180,7 +181,7 @@ class Replace a where
   replace :: a -> FinalPass a
 
 lookupLabel ident = 
-    do addr <- lookupAddr (ValProc (Label ident))
+    do addr <- lookupAddr ident
        case addr of
          Just (Addr n) -> return n
          Nothing -> throwError ("Couldn't find label: " ++ (show ident))
@@ -212,7 +213,7 @@ instance Replace Expr where
 instance Replace Term where
   replace (TermIdent CurInstruction) = throwError "Should not have reached this code"
   replace (TermIdent ident) = 
-    do addr <- lookupAddr (ValProc (Label ident))
+    do addr <- lookupAddr ident
        case addr of
          Just (Addr n) -> return $ TermLitNum (LitNum n)
          Nothing -> throwError ("Coudreturn $ ValIdent ident")

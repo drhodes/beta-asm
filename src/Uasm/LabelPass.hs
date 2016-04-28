@@ -48,6 +48,12 @@ data PlaceState = PlaceState { psCurAddr :: Integer
                              , psValueTable :: ValueTable
                              } deriving (Show, Eq)
 
+
+displayTableKeys table = show $ [x | (Ident x) <- DM.keys table]
+
+
+
+
 psIncCurAddr :: MonadState PlaceState m => m ()
 psIncCurAddr =
   do addr <- psGetCurAddr
@@ -171,7 +177,10 @@ labelPassAssn assn@(Assn CurInstruction expr) =
   do valTab <- psGetValueTable
      curAddr <- psGetCurAddr
      if hasUnknown expr valTab
-       then throwError $ "Unknown symbol: " ++ (show valTab)
+       then throwError $ "Unknown symbol found in: "
+            ++ (show $ PP.pretty expr)
+            ++ "\n"
+            ++ (displayTableKeys valTab)
        else do val <- eval expr
                case val of 
                  (ValNum addr) ->

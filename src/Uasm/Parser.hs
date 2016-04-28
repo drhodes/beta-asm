@@ -248,7 +248,6 @@ quotedString = do
     strings <- many character
     char '"'
     return $ concat strings
-
     
 ------------------------------------------------------------------
 

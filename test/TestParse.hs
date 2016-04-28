@@ -212,29 +212,6 @@ setupTest parser file = do
   let t = eraseComments txt
   justParse parser t
   
--- eraseLineComment [] _ = []
--- eraseLineComment src@(c:str) inComment =
---   if take 2 src == "//"
---   then "  " ++ (eraseLineComment (drop 2 src) True)
---   else if c == '\n'
---        then c:(eraseLineComment str False)
---        else if inComment
---             then ' ':(eraseLineComment str True)
---             else c:(eraseLineComment str False)
-
--- eraseBlockComment [] _ = []
--- eraseBlockComment src@(c:str) inComment =
---   if take 2 src == "/*" && not inComment
---   then "  " ++ (eraseBlockComment (drop 2 src) True)       
---   else if take 2 src == "*/" && inComment
---        then "  " ++ (eraseBlockComment (drop 2 src) False)
---        else if inComment               
---             then ' ':(eraseBlockComment str inComment)
---             else c:(eraseBlockComment str inComment)
-
--- eraseComments src =
---   (eraseLineComment
---    (eraseBlockComment src False) False)
 
 {-
 ------------------------------------------------------------------    
