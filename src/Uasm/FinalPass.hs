@@ -14,10 +14,7 @@ import           Uasm.Pretty
 import qualified Uasm.SymbolTable as SymTab
 import           Uasm.Types
 import qualified Data.Bits as DB
-import Control.Monad.State
 import Control.Monad.Except
-import Control.Monad.Trans.Except
-import Data.Functor.Identity
 import qualified Text.PrettyPrint.Leijen as PP
 
 {-
@@ -31,11 +28,9 @@ unknown identifiers aren't labels, then they are either forward
 symbols, which are not supported, or typos.  In either of the latter
 cases an error needs to be raised to alert the user.
 
-This pass will replace the forward labels with concrete addresses then
-eval the delayed expressions.  
+This pass will replace the forward labels with concrete byte addresses
+then eval the delayed expressions.
 
----------------------------------
-The value table contains
 -}
 
 type LabelMap = DM.Map Ident Addr
@@ -50,38 +45,24 @@ runExceptStateT :: s -> StateT s (ExceptT e m) a -> m (Either e (a, s))
 runExceptStateT s = runExceptT . flip runStateT s
 
 runFinalPass vals =
-  do (vs, _) <- runIdentity . runExceptStateT (DM.empty) $ finalPass vals
+  do (vs, _) <- runIdentity . runExceptStateT DM.empty $ finalPass vals
      return $ filter (/=ValNop) vs
-       
-insertLabel key val =
-  do table <- get
-     put $ DM.insert key val table
 
 lookupAddr :: Ident -> FinalPass (Maybe Addr)
-lookupAddr name =
-  do table <- get
-     return $ DM.lookup name table
-
--- labelMapInsert lbl@(Label _) addr m = DM.insert lbl addr m
+lookupAddr name = liftM (DM.lookup name) get
 
 isLabel (ValProc (Label _)) = True
 isLabel _ = False
 
 flattenVals :: [Value] -> [Value]
 flattenVals [] = []
-flattenVals ((ValSeq xs):rest) = flattenVals $ xs ++ rest
-flattenVals (x:xs) = x : (flattenVals xs)
+flattenVals (ValSeq xs : rest) = flattenVals $ xs ++ rest
+flattenVals (x:xs) = x : flattenVals xs
 
 identOfLabel (ValProc (Label name)) = name
 
 notLabel = not . isLabel
 
--- OKAY! Here's the bug. Labels are automatically Word aligned!
-
--- Another possibility: the Expression Label Identifier is being
--- removed before the mapM eval knowns.
-
--- finalPass :: [Value] -> FinalPass [Value]
 finalPass vals = 
   do 
     -- flatten sequences and remove the nops and
@@ -92,12 +73,12 @@ finalPass vals =
         placedLabels = filter (isLabel . fst) placedBytes
         -- create a lookup table for labels and their byte addresses
         labelMap = DM.fromList [(identOfLabel lbl, idx) | (lbl, idx) <-  placedLabels]
-
+    
     put labelMap
-    -- throwError $ show flatVals
     
     -- replace the unknown identifiers with values.
     knowns <- mapM replace flatVals --(map fst (filter (notLabel . fst) placedBytes))
+    
     -- evaluate the remaining values.
     mapM eval knowns
 
@@ -114,7 +95,7 @@ opApply op x y =
                       in f'
         LeftShift -> let f' x' y' = DB.shiftL (fromIntegral x') (fromIntegral y')
                      in f'
-        z -> error $ "Need to implement: " ++ (show z) ++ " for opApply in FinalPass"
+        z -> error $ "Need to implement: " ++ show z ++ " for opApply in FinalPass"
   in return $ ValNum (f x y)
 
 opVal bop (ValNum x) (ValNum y) = opApply bop x y
@@ -140,52 +121,35 @@ instance Eval Value where
   eval x = return x
 
 
-
 instance Eval Expr where
   eval (ExprNeg expr) = negative <$> eval expr
   eval (ExprTerm term) = eval term
   eval (ExprTermExpr term []) = eval term
   eval (ExprTermExpr term exprs) = 
     case exprs of      
-      [ExprBinTail binop rest] -> do v1 <- (eval term)
-                                     v2 <- (eval rest)
+      [ExprBinTail binop rest] -> do v1 <- eval term
+                                     v2 <- eval rest
                                      opVal binop v1 v2
-      ((ExprBinTail binop rest):xs) ->
-        do v1 <- (eval term)
-           v2 <- (eval rest)
+      (ExprBinTail binop rest : xs) ->
+        do v1 <- eval term
+           v2 <- eval rest
            val <- opVal binop v1 v2
            case val of
              (ValNum n) -> let term' = TermLitNum (LitNum n)
                            in eval (ExprTermExpr term' xs)
-             _ -> throwError $ "Weird Val in eval: " ++ (show val)
-      casex -> throwError $ "Unhandled Eval expr: " ++ (show casex)
+             _ -> throwError $ "Weird Val in eval: " ++ show val
+      casex -> throwError $ "Unhandled Eval expr: " ++ show casex
 
-  eval (ExprBinTail binop term) = throwError ("Binop Crap! " ++ (show (binop, term)))
+  eval (ExprBinTail binop term) = throwError ("Binop Crap! " ++ show (binop, term))
 
 instance Eval Term where
-  -- eval (TermIdent CurInstruction) = ValNum <$> psGetCurAddr
-  -- eval (TermIdent ident) =
-  --   do found <- psLookupVal ident
-  --      case found of
-  --        Just val -> return val
-  --        Nothing -> return $ ValIdent ident
-                                
   eval (TermNeg term) = negative <$> eval term
   eval (TermExpr expr) = eval expr
   eval (TermLitNum (LitNum n)) = return $ ValNum n
 
-
-
 --------------------------------------------
 class Replace a where
   replace :: a -> FinalPass a
-
-lookupLabel ident = 
-    do addr <- lookupAddr ident
-       case addr of
-         Just (Addr n) -> return n
-         Nothing -> throwError ("Couldn't find label: " ++ (show ident))
-
 
 instance Replace Value where
   replace val@(ValIdent ident) = ValNum <$> lookupLabel ident
@@ -196,7 +160,7 @@ instance Replace Value where
   replace (Delayed binop value1 value2) =
     liftM2 (Delayed binop) (replace value1) (replace value2)
   replace val@(ValNum _) = return val
-  -- ValProc, this needs to be handled ... 
+  -- ValProc, this needs to be handled for dealing with simulator flags.
   replace (ValProc _) = return ValNop
   replace x = return x
   -- replace x = throwError $ "Unhandled: " ++ (show x)
@@ -216,8 +180,13 @@ instance Replace Term where
     do addr <- lookupAddr ident
        case addr of
          Just (Addr n) -> return $ TermLitNum (LitNum n)
-         Nothing -> throwError ("Coudreturn $ ValIdent ident")
-                                
+         Nothing -> throwError $ "Couldn't find symbol: " ++ show ident
   replace (TermNeg term) = TermNeg <$> replace term
   replace (TermExpr expr) = TermExpr <$> replace expr
   replace x = return x
+
+lookupLabel ident = 
+    do addr <- lookupAddr ident
+       case addr of
+         Just (Addr n) -> return n
+         Nothing -> throwError ("Couldn't find label: " ++ show ident)

@@ -120,7 +120,6 @@ testAll = testGroup "TestLabelPass.hs"
       
     , testCaseBeta "reserve1.uasm" [ValNum 1]
     , testCaseBeta "reserve2.uasm" [ValNum 0, ValNum 0,ValNum 0,ValNum 0]
-      
     ]
   
 --------------------------------------------
