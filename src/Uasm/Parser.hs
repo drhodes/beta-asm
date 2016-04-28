@@ -211,6 +211,7 @@ proc = do choice [ try $ do string ".include"
                             qs <- quotedString
                             return $ DotAscii qs
                  , try $ do string ".text"
+                            spacex
                             qs <- quotedString
                             return $ DotText qs
                  , try $ string ".breakpoint" >> return DotBreakPoint

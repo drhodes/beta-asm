@@ -130,10 +130,19 @@ labelPassProc lbl@(Label name) =
      psInsertValue name (ValNum addr)     
      return $ ValProc lbl
 
-
 labelPassProc (DotAscii txt) =
   do psIncCurAddrN (length txt)
      return $ ValSeq $ map (ValNum . fromIntegral . DC.ord) txt
+
+
+-- Like .ascii except an additional 0 byte is added to the end of the
+-- string in memory and the next byte assembled will be word-aligned.
+labelPassProc (DotText txt) = 
+  do (ValSeq ys) <- labelPassProc (DotAscii txt)
+     (ValSeq xs) <- align 4
+     let nullByte = ValNum 0
+     return $ ValSeq (ys ++ [nullByte] ++ xs)
+
 
 labelPassProc (DotAlign expr) =
   do addr <- psGetCurAddr
@@ -146,6 +155,13 @@ labelPassProc (DotAlign expr) =
                            return $ ValSeq (take padLen $ repeat (ValNum 0))
        _ -> throwError $ "Couldn't evaluate expression in a .align: " ++ (show expr)
 
+align n =
+  do addr <- psGetCurAddr
+     if addr `mod` n == 0
+       then return $ ValSeq []
+       else do let padLen = fromIntegral $ n - ((addr + n) `mod` n)
+               replicateM_ padLen psIncCurAddr
+               return $ ValSeq (take padLen $ repeat (ValNum 0))     
      
 labelPassAssn assn@(Assn CurInstruction expr) =
   -- try to eval expr, this might not work because expr might contain

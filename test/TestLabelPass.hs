@@ -235,6 +235,18 @@ testProc = testGroup "TestLabelPass.hs Procs"
              ]
     ]
 
+    --------------------------------------------
+  , testCase "testProc2" $ testLabelPass
+    (unlines [ ".text \"ABCD\""
+             ])
+    [ ValSeq [ ValNum 0x41
+             , ValNum 0x42
+             , ValNum 0x43
+             , ValNum 0x44
+             , ValNum 0x00
+             ]
+    ]
+    
 
     
     
