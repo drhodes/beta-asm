@@ -207,6 +207,7 @@ proc = do choice [ try $ do string ".include"
                             x <- expr2
                             return $ DotAlign x
                  , try $ do string ".ascii"
+                            spacex
                             qs <- quotedString
                             return $ DotAscii qs
                  , try $ do string ".text"

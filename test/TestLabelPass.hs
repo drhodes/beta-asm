@@ -206,29 +206,6 @@ testAll = testGroup "TestLabelPass.hs"
       [ ValNum 0 
       , ValNum 0xEF, ValNum 0xBE, ValNum 0xAD, ValNum 0xDE
       ]
-
-      -- this needs to be handled in FinalPass, because of the forward label.
-      --------------------------------------------
-      -- , testIt "test23"
-      --   (unlines [ "."
-      --            , "r31 = 31"
-      --            , ".macro WORD(x) x%0x100 (x>>8)%0x100"
-      --            , ".macro LONG(x) WORD(x) WORD(x >> 16)"
-      --            , ".macro betaopc(OP,RA,CC,RC) {"
-      --            , "   .align 4"
-      --            , "   LONG((OP<<26)+((RC%0x20)<<21)+((RA%0x20)<<16)+(CC%0x10000)) }"
-      --            , ".macro BETABR(OP,RA,RC,LABEL)   betaopc(OP,RA,((LABEL-.)>>2)-1, RC)"
-      --            , ".macro BEQ(RA, LABEL, RC)       BETABR(0x1C,RA,RC,LABEL)"
-      --            , ".macro BR(LABEL,RC)             BEQ(r31, LABEL, RC)"
-      --            , ".macro BR(LABEL) BR(LABEL, r31)"
-      --            , "BR(LABEL)"
-      --            , "LABEL:"
-      --            , "."
-      --            ])
-      --   [ ValNum 0
-      --   , ValNum 0
-      --   , ValNum 2
-      --   ]
     
   ]
 
@@ -236,7 +213,7 @@ testAll = testGroup "TestLabelPass.hs"
 testProc = testGroup "TestLabelPass.hs Procs"
   [
     --------------------------------------------
-    testCase "test1" $ testLabelPass
+    testCase "testProc1" $ testLabelPass
     (unlines [ "1 2"
              , ".align 4"
              , "3"
@@ -246,6 +223,20 @@ testProc = testGroup "TestLabelPass.hs Procs"
     , ValSeq [ValNum 0, ValNum 0]
     , ValNum 3
     ]
+    
+    --------------------------------------------
+  , testCase "testProc2" $ testLabelPass
+    (unlines [ ".ascii \"ABCD\""
+             ])
+    [ ValSeq [ ValNum 0x41
+             , ValNum 0x42
+             , ValNum 0x43
+             , ValNum 0x44
+             ]
+    ]
+
+
+    
     
   ] -- eof of testProc
 

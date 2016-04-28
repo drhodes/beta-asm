@@ -26,6 +26,7 @@ tests :: TestTree
 tests = testGroup "Tests" [ parseTests
                           , TE.testAll
                           , TLP.testAll
+                          , TLP.testProc
                           , TFP.testAll
                           , TB.tests
                           -- , TFD.assigns

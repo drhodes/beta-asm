@@ -4,21 +4,22 @@
 module Uasm.LabelPass where
 
 import           Control.Monad
+import           Control.Monad.Except
+import           Control.Monad.Identity
+import           Control.Monad.State
 import           Control.Monad.State
 import           Control.Monad.Trans.Except
-import qualified Data.Map as DM
+import           Control.Monad.Trans.Except
+import qualified Data.Bits as DB
 import           Data.Functor.Identity
-import Control.Monad.Identity
+import           Data.Functor.Identity
+import qualified Data.Map as DM
+import qualified Text.PrettyPrint.Leijen as PP
 import           Uasm.Bind
 import           Uasm.Pretty
 import qualified Uasm.SymbolTable as SymTab
 import           Uasm.Types
-import qualified Data.Bits as DB
-import Control.Monad.State
-import Control.Monad.Except
-import Control.Monad.Trans.Except
-import Data.Functor.Identity
-import qualified Text.PrettyPrint.Leijen as PP
+import qualified Data.Char as DC
 
 {-
 Macros have been expanded.  Label addresses are unknown because
@@ -53,11 +54,18 @@ psIncCurAddr =
      psSetCurAddr (addr + 1)
      return ()
 
+psIncCurAddrN n =
+  do addr <- psGetCurAddr
+     psSetCurAddr (addr + (fromIntegral n))
+     return ()
+
+
 psSetCurAddr :: MonadState PlaceState m => Integer -> m ()
 psSetCurAddr n =
   do ps@(PlaceState _ _) <- get
      put ps{psCurAddr = n}
      return ()
+
 
 psGetCurAddr :: MonadState PlaceState m => m Integer
 psGetCurAddr =
@@ -122,6 +130,11 @@ labelPassProc lbl@(Label name) =
      psInsertValue name (ValNum addr)     
      return $ ValProc lbl
 
+
+labelPassProc (DotAscii txt) =
+  do psIncCurAddrN (length txt)
+     return $ ValSeq $ map (ValNum . fromIntegral . DC.ord) txt
+
 labelPassProc (DotAlign expr) =
   do addr <- psGetCurAddr
      val <- eval expr
@@ -132,8 +145,6 @@ labelPassProc (DotAlign expr) =
                            replicateM_ padLen psIncCurAddr
                            return $ ValSeq (take padLen $ repeat (ValNum 0))
        _ -> throwError $ "Couldn't evaluate expression in a .align: " ++ (show expr)
-
-
 
      
 labelPassAssn assn@(Assn CurInstruction expr) =
