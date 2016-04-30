@@ -1,24 +1,12 @@
-{-# LANGUAGE MonomorphismRestriction #-}
-{-# LANGUAGE FlexibleContexts #-}
-
 import           Uasm.Parser
 import           Uasm.Types
 import qualified Text.Parsec as TP
 import qualified TestExpand as TE
 import qualified TestLabelPass as TLP
 import qualified TestFinalPass as TFP
-import qualified TestBind as TB
-import           Text.Parsec.Error
-import           Text.Parsec.String
-import           Control.Monad
 
 import           Test.Tasty
 import           Test.Tasty.HUnit
-import           Test.Tasty.QuickCheck as QC
-import           Test.Tasty.SmallCheck as SC
-
-import           Data.List
-import           Data.Ord
 
 main = defaultMain tests
 
@@ -28,8 +16,6 @@ tests = testGroup "Tests" [ parseTests
                           , TLP.testAll
                           , TLP.testProc
                           , TFP.testAll
-                          , TB.tests
-                          -- , TFD.assigns
                           ]
 
 parseTests = testGroup "Parse tests"
@@ -61,7 +47,7 @@ justParse :: (Eq a, Show a) => TP.Parsec [Char] () a -> [Char] -> IO ()
 justParse rule str = do  
   let result = TP.parse (rule <* TP.eof) "" str
   case result of
-    (Right v) -> return ()
+    (Right _) -> return ()
     (Left msg) -> error $ (show msg) ++ "\n\n" ++ (show str)
 
 testLitNums = do

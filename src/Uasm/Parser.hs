@@ -1,16 +1,8 @@
 module Uasm.Parser where
 
-import           Data.Functor.Identity
 import           Debug.Trace
 import           Text.Parsec
-import           Text.Parsec.Char
 import           Text.Parsec.String
-import           Text.Parsec.Expr
-import           Text.ParserCombinators.Parsec.Char
-import qualified Text.ParserCombinators.Parsec.Expr as E
-import           Text.ParserCombinators.Parsec.Language
-import           Text.ParserCombinators.Parsec.Token
-import qualified Text.ParserCombinators.Parsec.Token as Token
 
 import           Uasm.Types
 
@@ -33,12 +25,14 @@ ident1 = do
   part2 <- many $ alphaNum <|> oneOf "_"
   return $ Ident (part1 : part2)
 
+ident3 :: Parser Ident
 ident3 = do
   dbg "ident3"
   s <- char '.'
   dbg s
   return CurInstruction
 
+ident :: Parser Ident
 ident = do
   dbg "ident"
   choice [ try ident1
@@ -180,6 +174,7 @@ term = do
          , try term3
          , try term4
          ]
+    
 term1 = dbg "term1" >> ident >>= return . TermIdent
 term2 = dbg "term2" >> litNum >>= return . TermLitNum
 term3 = do

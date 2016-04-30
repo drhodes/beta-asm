@@ -6,19 +6,10 @@ module Uasm.Expand where
 import           Control.Monad
 import           Control.Monad.State
 import           Control.Monad.Trans.Except
-import qualified Data.Map as DM
 import           Data.Functor.Identity
-import Control.Monad.Identity
-import           Uasm.Bind
-import           Uasm.Pretty
 import qualified Uasm.SymbolTable as SymTab
 import           Uasm.Types
-import Control.Applicative
-import Control.Monad.State
 import Control.Monad.Except
-import Control.Monad.Trans.Except
-import Data.Functor.Identity
-import qualified Text.PrettyPrint.Leijen as PP
 
 type ExpandErr a b = forall m. ( MonadState SymbolTable m,
                                  MonadError String m ) => a -> m b
@@ -32,6 +23,9 @@ runExceptStateT :: Monad m => s -> StateT s (ExceptT e m) a -> m (Either e (a, s
 runExceptStateT s = runExceptT . flip runStateT s
 
 expand expandFunc node = runIdentity . runExceptStateT (SymTab.new) $ expandFunc node
+
+uniRunExpand expandFunc node = fst <$> expand expandFunc node
+
 
 flattenTops :: [TopLevel] -> [Stmt]
 flattenTops [] = []
@@ -72,7 +66,7 @@ expandCall (Call ident exprs) =
        Nothing -> throwError $ show ("Macro definition not found: " ++ show ident)
 
 bindMacro :: [Expr] -> ExpandErr Macro Stmt
-bindMacro exprs (Macro name args stmts) =
+bindMacro exprs (Macro _ args stmts) =
   -- flatten macro into many statements
   do when (length args /= length exprs) $
        throwError "(Improbable error) in Expand.bindMacro, argument length mismatch"

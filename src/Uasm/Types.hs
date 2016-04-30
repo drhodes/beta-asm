@@ -32,9 +32,6 @@ data Value = ValNum Integer
            | Delayed Binop Value Value
              deriving (Show, Eq, Ord)
 
--- class Eval a where
---   eval :: a -> SymbolTable -> Either String Value
-
 data TopLevel = TopStmt Stmt
               | TopMacro Macro
                 deriving (Show, Eq, Ord)
@@ -54,9 +51,7 @@ data Assn = Assn Ident Expr deriving (Show, Eq, Ord)
 
 data Call = Call Ident [Expr] deriving (Show, Eq, Ord)
 
-
 data PlacedByte = PlacedByte Addr DW.Word8
-
 
 data Proc = DotInclude String
           | DotAlign Expr

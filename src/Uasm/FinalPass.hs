@@ -9,7 +9,6 @@ import           Control.Monad.Trans.Except
 import qualified Data.Map as DM
 import           Data.Functor.Identity
 import Control.Monad.Identity
-import           Uasm.Bind
 import           Uasm.Pretty
 import qualified Uasm.SymbolTable as SymTab
 import           Uasm.Types
@@ -18,7 +17,6 @@ import Control.Monad.Except
 import qualified Text.PrettyPrint.Leijen as PP
 
 {-
-
 This is the final pass
 
 The remaining artifact at this point is a list of values, some of
@@ -30,7 +28,6 @@ cases an error needs to be raised to alert the user.
 
 This pass will replace the forward labels with concrete byte addresses
 then eval the delayed expressions.
-
 -}
 
 type LabelMap = DM.Map Ident Addr
@@ -48,8 +45,11 @@ runFinalPass vals =
   do (vs, _) <- runIdentity . runExceptStateT DM.empty $ finalPass vals
      return $ filter (/=ValNop) vs
 
+
+
+
 lookupAddr :: Ident -> FinalPass (Maybe Addr)
-lookupAddr name = liftM (DM.lookup name) get
+lookupAddr name = DM.lookup name <$> get 
 
 isLabel (ValProc (Label _)) = True
 isLabel _ = False
@@ -60,8 +60,6 @@ flattenVals (ValSeq xs : rest) = flattenVals $ xs ++ rest
 flattenVals (x:xs) = x : flattenVals xs
 
 identOfLabel (ValProc (Label name)) = name
-
-notLabel = not . isLabel
 
 finalPass vals = 
   do 
@@ -77,7 +75,7 @@ finalPass vals =
     put labelMap
     
     -- replace the unknown identifiers with values.
-    knowns <- mapM replace flatVals --(map fst (filter (notLabel . fst) placedBytes))
+    knowns <- mapM replace flatVals
     
     -- evaluate the remaining values.
     mapM eval knowns
@@ -119,7 +117,6 @@ instance Eval Value where
   -- ValProc, this needs to be handled ... 
   eval (ValProc _) = return ValNop
   eval x = return x
-
 
 instance Eval Expr where
   eval (ExprNeg expr) = negative <$> eval expr

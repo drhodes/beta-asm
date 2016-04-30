@@ -2,16 +2,9 @@ module TestExpand where
 
 import           Uasm.Parser
 import           Uasm.Types
-import           Uasm.Eval
 import           Uasm.Expand
-import qualified Uasm.Pretty as PP
-import qualified Uasm.SymbolTable as SymTab
-import Text.PrettyPrint.Leijen
   
 import qualified Text.Parsec as TP
-import           Text.Parsec.Error
-import           Text.Parsec.String
-import           Control.Monad
 
 import Test.Tasty
 import Test.Tasty.HUnit
@@ -52,8 +45,8 @@ testAll = testGroup "TestExpand.hs"
 testExpand prog expect = do  
   case TP.parse (TP.many topLevel) "" prog of
     (Right tops) ->
-      do case expand expandTopLevels tops of
-           (Right (topLevels, symtab)) ->
+      do case uniRunExpand expandTopLevels tops of
+           (Right topLevels) ->
              let result = flattenTops topLevels
              in if result == expect
                 then do return () 

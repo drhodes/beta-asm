@@ -2,17 +2,10 @@ module TestLabelPass where
 
 import           Uasm.Parser
 import           Uasm.Types
-import           Uasm.Eval
 import           Uasm.Expand
 import           Uasm.LabelPass
-import qualified Uasm.Pretty as PP
-import qualified Uasm.SymbolTable as SymTab
-import Text.PrettyPrint.Leijen
   
 import qualified Text.Parsec as TP
-import           Text.Parsec.Error
-import           Text.Parsec.String
-import           Control.Monad
 
 import Test.Tasty
 import Test.Tasty.HUnit
@@ -265,10 +258,10 @@ testLabelPass :: String -> [Value] -> IO ()
 testLabelPass prog expect = do  
   case TP.parse (TP.many topLevel <* TP.eof) "" prog of
     (Right tops) ->
-       case expand expandTopLevels tops of
-         (Right (topLevels, symtab)) ->
-           case runLabelPass labelPassStmts (flattenTops topLevels) of
-             Right (result, valueTable) ->
+       case uniRunExpand expandTopLevels tops of
+         (Right topLevels) ->
+           case uniLabelPass (flattenTops topLevels) of
+             Right result ->
                if result == expect
                then do return () 
                else do let trunc x = putStrLn $ take 2000 $ show x

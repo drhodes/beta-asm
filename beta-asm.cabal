@@ -15,13 +15,12 @@ cabal-version:       >=1.10
 
 library
   ghc-prof-options:    -fprof-auto
+  ghc-options:         -Wall
   hs-source-dirs:      src
   exposed-modules:     Uasm.Parser
-                     , Uasm.Eval
                      , Uasm.Types 
                      , Uasm.Expand
                      , Uasm.Pretty
-                     , Uasm.Bind
                      , Uasm.SymbolTable
                      , Uasm.LabelPass
                      , Uasm.FinalPass

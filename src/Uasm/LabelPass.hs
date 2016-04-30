@@ -7,17 +7,10 @@ import           Control.Monad
 import           Control.Monad.Except
 import           Control.Monad.Identity
 import           Control.Monad.State
-import           Control.Monad.State
-import           Control.Monad.Trans.Except
-import           Control.Monad.Trans.Except
 import qualified Data.Bits as DB
-import           Data.Functor.Identity
-import           Data.Functor.Identity
 import qualified Data.Map as DM
 import qualified Text.PrettyPrint.Leijen as PP
-import           Uasm.Bind
-import           Uasm.Pretty
-import qualified Uasm.SymbolTable as SymTab
+import Uasm.Pretty
 import           Uasm.Types
 import qualified Data.Char as DC
 
@@ -48,11 +41,8 @@ data PlaceState = PlaceState { psCurAddr :: Integer
                              , psValueTable :: ValueTable
                              } deriving (Show, Eq)
 
-
+displayTableKeys :: DM.Map Ident a -> String
 displayTableKeys table = show $ [x | (Ident x) <- DM.keys table]
-
-
-
 
 psIncCurAddr :: MonadState PlaceState m => m ()
 psIncCurAddr =
@@ -109,12 +99,14 @@ runExceptStateT s = runExceptT . flip runStateT s
 
 runLabelPass func node = runIdentity . runExceptStateT (newPlaceState) $ func node
 
+uniLabelPass node = liftM fst $ runLabelPass labelPassStmts node
+
 --------------------------------------------
 labelPassStmts stmts = mapM labelPassStmt stmts
 
 labelPassStmt :: Stmt -> LabelPass Value
 labelPassStmt (StmtProc p) = labelPassProc p
-labelPassStmt (StmtCall call) = throwError $
+labelPassStmt (StmtCall _) = throwError $
   "labelPassStmt shouldn't handle any macro calls, \ 
   \they should have been flattened alreadu in Uasm.Expand"
 
@@ -169,7 +161,7 @@ align n =
                replicateM_ padLen psIncCurAddr
                return $ ValSeq (take padLen $ repeat (ValNum 0))     
      
-labelPassAssn assn@(Assn CurInstruction expr) =
+labelPassAssn (Assn CurInstruction expr) =
   -- try to eval expr, this might not work because expr might contain
   -- a label that has yet to be encountered, and if that's the case,
   -- then this should fail.
@@ -192,7 +184,7 @@ labelPassAssn assn@(Assn CurInstruction expr) =
 
                  x -> throwError $ "Can't assign program counter to: " ++ (show x)
 
-labelPassAssn assn@(Assn ident@(Ident name) expr) =               
+labelPassAssn assn@(Assn ident@(Ident _) expr) =               
   -- else the LHS is not (.), therefore it's okay for label
   -- identifiers found in expressions to delay evaluation, this is
   -- necessary to have BR(label) work.  Any such labels will be
@@ -217,7 +209,7 @@ instance HasUnknown Expr where
   hasUnknown (ExprNeg expr) vt = hasUnknown expr vt
   hasUnknown (ExprTerm term) vt = hasUnknown term vt
   hasUnknown (ExprTermExpr term exprs) vt = hasUnknown term vt || hasUnknown exprs vt
-  hasUnknown (ExprBinTail binop term) vt = hasUnknown term vt
+  hasUnknown (ExprBinTail _ term) vt = hasUnknown term vt
 
 instance HasUnknown Term where  
   hasUnknown (TermIdent CurInstruction) _ = False
