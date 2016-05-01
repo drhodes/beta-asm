@@ -1,50 +1,33 @@
 module Main where
-
-import Uasm.Expand
-import Uasm.FinalPass
-import Uasm.LabelPass
-import Uasm.Parser
+import qualified Text.Parsec as TP
+import           Uasm.Expand
+import           Uasm.FinalPass
+import           Uasm.LabelPass
+import qualified Uasm.Parser as P
+import           Uasm.Types
 
 main :: IO ()
 main = print "hi"
 
-
-assemble prog = do
-  
-
-
-testFileWithBeta fname expect =
+assemble fname =
   do beta <- readFile "test/uasm/beta.uasm"
      prog <- readFile $ "test/uasm/" ++ fname
-     testFinalPass (eraseComments (beta ++ "\n" ++ prog)) expect
-     
-testFinalPass :: String -> [Value] -> IO ()
-testFinalPass prog expect = 
-  do labelPassResult <- doLabelPass prog
+     let src = P.eraseComments $ beta ++ "\n" ++ prog
+     let result = doFinalPass src
+     return result
+
+doFinalPass src = 
+  do labelPassResult <- doLabelPass src
      case labelPassResult of
-       (Right (vals, placeState)) ->
-         case runFinalPass vals of
-           Right result ->
-             unless (expect == result) $
-               do let trunc x = putStrLn $ take 2000 $ show x
-                  putStrLn "\nFail"
-                  trunc  prog
-                  putStrLn "\nExpected"
-                  trunc expect
-                  putStrLn "\nGot"
-                  trunc result
-                  putStrLn "\nLabelPass"
-                  trunc vals
-                  error "test fails"
-           Left msg -> error msg
+       (Right (vals, _)) -> runFinalPass vals
        (Left msg) -> error msg
 
 doLabelPass :: Monad m => String -> m (Either String ([Value], PlaceState))
 doLabelPass prog = do  
-  case TP.parse (TP.many topLevel <* TP.eof) "" prog of
+  case TP.parse (TP.many P.topLevel <* TP.eof) "" prog of
     (Right tops) ->
        case expand expandTopLevels tops of
-         (Right (topLevels, symtab)) ->
+         (Right (topLevels, _)) ->
            return $ runLabelPass labelPassStmts (flattenTops topLevels) 
          (Left msg) -> error msg
     (Left msg) -> error (show msg)

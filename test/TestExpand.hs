@@ -45,7 +45,7 @@ testAll = testGroup "TestExpand.hs"
 testExpand prog expect = do  
   case TP.parse (TP.many topLevel) "" prog of
     (Right tops) ->
-      do case uniRunExpand expandTopLevels tops of
+      do case uniRunExpand tops of
            (Right topLevels) ->
              let result = flattenTops topLevels
              in if result == expect

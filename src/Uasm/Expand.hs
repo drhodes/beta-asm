@@ -11,8 +11,8 @@ import qualified Uasm.SymbolTable as SymTab
 import           Uasm.Types
 import Control.Monad.Except
 
-type ExpandErr a b = forall m. ( MonadState SymbolTable m,
-                                 MonadError String m ) => a -> m b
+type ExpandErr b = forall m. ( MonadState SymbolTable m,
+                               MonadError String m ) => m b
 
 -- runStateExceptT :: Monad m => s -> ExceptT e (StateT s m) a -> m (Either e a, s)
 
@@ -24,7 +24,8 @@ runExceptStateT s = runExceptT . flip runStateT s
 
 expand expandFunc node = runIdentity . runExceptStateT (SymTab.new) $ expandFunc node
 
-uniRunExpand expandFunc node = fst <$> expand expandFunc node
+uniRunExpand :: [TopLevel] -> Either [Char] [TopLevel]
+uniRunExpand nodes = fst <$> expand expandTopLevels nodes
 
 
 flattenTops :: [TopLevel] -> [Stmt]
@@ -37,13 +38,14 @@ flattenStmt (StmtExpr (ExprTerm (TermExpr x))) = flattenStmt (StmtExpr x)
 flattenStmt x = [x]
 
   
+expandTopLevels :: [TopLevel] -> ExpandErr [TopLevel]
 expandTopLevels xs = mapM expandTopLevel xs
 
-expandTopLevel :: ExpandErr TopLevel TopLevel
+expandTopLevel :: TopLevel -> ExpandErr TopLevel
 expandTopLevel (TopStmt stmt) = TopStmt <$> expandStmt stmt
 expandTopLevel (TopMacro mac) = SymTab.mInsertMacro mac >> return (TopMacro mac)
 
-expandStmt :: ExpandErr Stmt Stmt
+expandStmt :: Stmt -> ExpandErr Stmt
 expandStmt (StmtAssn assn) = StmtAssn <$> expandAssn assn -- this inserts an ident.
 expandStmt (StmtExpr expr) = StmtExpr <$> expandExpr expr 
 expandStmt (StmtProc proc) = return $ StmtProc proc
@@ -57,7 +59,7 @@ expandStmt (StmtMany stmts) = StmtMany <$> mapM expandStmt stmts
 -- expressions involve the (.) current instruction, therefore label
 -- addresses can't be known, yet.
 
-expandCall :: ExpandErr Call Stmt
+expandCall :: Call -> ExpandErr Stmt
 expandCall (Call ident exprs) =
   do let k = KeyMacro ident (length exprs)
      mac <- SymTab.mLookupMacro k
@@ -65,7 +67,7 @@ expandCall (Call ident exprs) =
        Just mac' -> bindMacro exprs mac'
        Nothing -> throwError $ show ("Macro definition not found: " ++ show ident)
 
-bindMacro :: [Expr] -> ExpandErr Macro Stmt
+bindMacro :: [Expr] -> Macro -> ExpandErr Stmt
 bindMacro exprs (Macro _ args stmts) =
   -- flatten macro into many statements
   do when (length args /= length exprs) $
@@ -96,7 +98,7 @@ expandAssn assn@(Assn ident expr) =
        else do SymTab.mInsert k expr
                return assn
 
-expandTerm :: ExpandErr Term Term
+expandTerm :: Term -> ExpandErr Term
 expandTerm term@(TermIdent ident) =
   do let k = KeyIdent ident     
      if ident == CurInstruction          
@@ -110,7 +112,7 @@ expandTerm (TermExpr expr) = TermExpr <$> expandExpr expr
 expandTerm (TermNeg term) = TermNeg <$> expandTerm term
 expandTerm term = return term
 
-expandExpr :: ExpandErr Expr Expr
+expandExpr :: Expr -> ExpandErr Expr
 expandExpr (ExprNeg expr) = ExprNeg <$> expandExpr expr
 expandExpr (ExprTerm term) = ExprTerm <$> expandTerm term
 expandExpr (ExprTermExpr term []) = ExprTerm <$> expandTerm term

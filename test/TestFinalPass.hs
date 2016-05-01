@@ -181,7 +181,7 @@ doLabelPass :: Monad m => String -> m (Either String ([Value], PlaceState))
 doLabelPass prog = do  
   case TP.parse (TP.many topLevel <* TP.eof) "" prog of
     (Right tops) ->
-       case uniRunExpand expandTopLevels tops of
+       case uniRunExpand tops of
          (Right topLevels) ->
            return $ runLabelPass labelPassStmts (flattenTops topLevels) 
          (Left msg) -> error msg

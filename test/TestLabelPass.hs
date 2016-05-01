@@ -258,7 +258,7 @@ testLabelPass :: String -> [Value] -> IO ()
 testLabelPass prog expect = do  
   case TP.parse (TP.many topLevel <* TP.eof) "" prog of
     (Right tops) ->
-       case uniRunExpand expandTopLevels tops of
+       case uniRunExpand tops of
          (Right topLevels) ->
            case uniLabelPass (flattenTops topLevels) of
              Right result ->
@@ -277,3 +277,4 @@ testLabelPass prog expect = do
              Left msg -> error msg
          (Left msg) -> error msg
     (Left msg) -> error (show msg)
+

@@ -15,7 +15,7 @@ cabal-version:       >=1.10
 
 library
   ghc-prof-options:    -fprof-auto
-  ghc-options:         -Wall
+  --ghc-options:         -Wall
   hs-source-dirs:      src
   exposed-modules:     Uasm.Parser
                      , Uasm.Types 

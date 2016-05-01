@@ -97,9 +97,14 @@ runStateExceptT s = flip runStateT s . runExceptT
 runExceptStateT :: s -> StateT s (ExceptT e m) a -> m (Either e (a, s))
 runExceptStateT s = runExceptT . flip runStateT s
 
+runLabelPass :: (t -> StateT PlaceState (ExceptT e Identity) a)
+             -> t
+             -> Either e (a, PlaceState)
+             
 runLabelPass func node = runIdentity . runExceptStateT (newPlaceState) $ func node
 
-uniLabelPass node = liftM fst $ runLabelPass labelPassStmts node
+uniLabelPass :: [Stmt] -> Either String [Value]
+uniLabelPass nodes = liftM fst $ runLabelPass labelPassStmts nodes
 
 --------------------------------------------
 labelPassStmts stmts = mapM labelPassStmt stmts
