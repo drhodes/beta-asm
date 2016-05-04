@@ -15,7 +15,7 @@ cabal-version:       >=1.10
 
 library
   ghc-prof-options:    -fprof-auto
-  --ghc-options:         -Wall
+--  ghc-options:         -Wall
   hs-source-dirs:      src
   exposed-modules:     Uasm.Parser
                      , Uasm.Types 
@@ -32,9 +32,11 @@ library
                      , hex >= 0.1.2
                      , mtl >= 2.2.1
                      , parsec >= 3.1.9
+                     , prelude-safeenum >= 0.1.1.2
                      , tasty-hunit >= 0.9.2
                      , tasty-quickcheck >= 0.8.4
                      , tasty-smallcheck >= 0.8.1
+                     , text >= 1.2.2.0
                      , transformers >= 0.4.2.0
                      , wl-pprint >= 1.2
   default-language:    Haskell2010
@@ -56,6 +58,7 @@ test-suite beta-asm-test
                        , mtl
                        , parallel
                        , parsec >= 3.1.9
+                       , prelude-safeenum >= 0.1.1.2
                        , tasty
                        , tasty-golden
                        , tasty-hspec
@@ -63,6 +66,7 @@ test-suite beta-asm-test
                        , tasty-program >= 1.0.3
                        , tasty-quickcheck
                        , tasty-smallcheck
+                       , text >= 1.2.2.0
                        , transformers >= 0.4.2.0
                        , wl-pprint >= 1.2
   ghc-options:         -threaded -rtsopts -with-rtsopts=-N
@@ -77,6 +81,10 @@ executable beta-asm-exe
                      , containers >= 0.5.6.2
                      , hex >= 0.1.2
                      , parsec >= 3.1.9
+                     , prelude-safeenum >= 0.1.1.2
+                     , scotty
+                     , text >= 1.2.2.0
+                     , transformers
                      , wl-pprint >= 1.2
   default-language:    Haskell2010
 

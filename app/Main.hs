@@ -1,13 +1,48 @@
+{-# LANGUAGE OverloadedStrings #-}
+
 module Main where
+import           Control.Monad.IO.Class
 import qualified Text.Parsec as TP
 import           Uasm.Expand
 import           Uasm.FinalPass
 import           Uasm.LabelPass
 import qualified Uasm.Parser as P
 import           Uasm.Types
+import qualified Data.Text.Lazy as T
+import qualified Web.Scotty as WS
+import           Data.Bits
 
-main :: IO ()
-main = print "hi"
+main = do
+  print "ok"
+  putStrLn "BETA server starting..."
+  WS.scotty 3000 $ do
+    -- reset the CPU
+    WS.get "/reset" $ do
+      liftIO $ putStrLn "Resetting the CPU"
+      WS.text "Resetting the CPU"
+
+    WS.get "/assemble/:filename" $ do
+      fn <- WS.param "filename"
+      x <- liftIO $ assemble fn
+      WS.text $ T.pack (show x)
+
+padBytes bs = if length bs `mod` 4 == 0
+              then bs
+              else padBytes $ bs ++ [0]
+                   
+groupBytes [] = []
+groupBytes bs = (littlize $ take 4 bs) : groupBytes (drop 4 bs)
+
+littlize [d, c, b, a] =
+  let a' = shiftL a 24
+      b' = shiftL b 16
+      c' = shiftL c 8
+      d' = shiftL d 0
+  in d' .|. c' .|. b' .|. a'
+
+toBinary vals =
+  let bytes = padBytes [n | (ValNum n) <- vals]
+  in groupBytes bytes
 
 assemble fname =
   do beta <- readFile "test/uasm/beta.uasm"
