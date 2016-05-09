@@ -24,15 +24,21 @@ library
                      , Uasm.SymbolTable
                      , Uasm.LabelPass
                      , Uasm.FinalPass
+                     , Beta.Mach
+                     , Beta.Types
+                     , Beta.Decoder
+                     , Beta.Util
                           
   build-depends:       GenericPretty >= 1.2.1
                      , base >= 4.7 && < 5
                      , containers >= 0.5.6.2
                      , generic-pretty >= 0.1.0
                      , hex >= 0.1.2
+                     , json >= 0.9.1
                      , mtl >= 2.2.1
                      , parsec >= 3.1.9
                      , prelude-safeenum >= 0.1.1.2
+                     , syb >= 0.6
                      , tasty-hunit >= 0.9.2
                      , tasty-quickcheck >= 0.8.4
                      , tasty-smallcheck >= 0.8.1
@@ -45,9 +51,9 @@ test-suite beta-asm-test
   ghc-prof-options:    -fprof-auto
   type:                exitcode-stdio-1.0
   hs-source-dirs:      test  
-  main-is:             TestParse.hs
+  main-is:             TestAll.hs
   build-depends:       
-                             HUnit
+                                 HUnit
                        , GenericPretty >= 1.2.1
                        , QuickCheck
                        , base
@@ -55,10 +61,12 @@ test-suite beta-asm-test
                        , containers >= 0.5.6.2
                        , generic-pretty >= 0.1.0
                        , hex >= 0.1.2
+                       , json >= 0.9.1
                        , mtl
                        , parallel
                        , parsec >= 3.1.9
                        , prelude-safeenum >= 0.1.1.2
+                       , syb >= 0.6
                        , tasty
                        , tasty-golden
                        , tasty-hspec
@@ -80,9 +88,12 @@ executable beta-asm-exe
                      , beta-asm
                      , containers >= 0.5.6.2
                      , hex >= 0.1.2
+                     , json >= 0.9.1
+                     , mtl
                      , parsec >= 3.1.9
                      , prelude-safeenum >= 0.1.1.2
                      , scotty
+                     , syb >= 0.6
                      , text >= 1.2.2.0
                      , transformers
                      , wl-pprint >= 1.2

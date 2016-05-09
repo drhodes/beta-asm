@@ -41,12 +41,12 @@ decode word =
       let rc = bits 25 21
           ra = bits 20 16
           lit = bitRange word 15 0
-      in return $ OPC opcode rc ra (sxt (fromIntegral lit))
+      in return $ OPC opcode rc ra (fromIntegral lit)
     0b01 -> -- special class
       let rc = bits 25 21
           ra = bits 20 16
           lit = bitRange word 15 0
-      in return $ OPC opcode rc ra (sxt (fromIntegral lit))
+      in return $ OPC opcode rc ra (fromIntegral lit)
     x -> throwError $ "Invalid instruction: " ++ (showHex x "")
 
 

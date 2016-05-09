@@ -4,13 +4,18 @@ build: ## build
 
 test: FORCE ## test
 	stack test --ghc-options -fprof-auto --test-arguments +RTS -N -RTS '--hide-successes'
+	stack install
 
 clean: FORCE ## clean all the things
 	sh clean.sh
 
 work: ## open all files in editor
 	emacs -nw *.cabal Makefile \
-	battle-plan.org src/Uasm/*.hs src/Beta/*.hs app/*.hs test/*.hs 
+	battle-plan.org src/Uasm/*.hs \
+	src/Beta/*.hs \
+	app/*.hs \
+	test/*.hs \
+	test/TestBeta/*.hs
 
 setup:
 	touch battle-plan.org

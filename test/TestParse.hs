@@ -1,3 +1,4 @@
+module TestParse where
 
 import           Uasm.Parser
 import           Uasm.Types
@@ -9,15 +10,15 @@ import qualified TestFinalPass as TFP
 import           Test.Tasty
 import           Test.Tasty.HUnit
 
-main = defaultMain tests
+-- main = defaultMain tests
 
-tests :: TestTree
-tests = testGroup "Tests" [ parseTests
-                          , TE.testAll
-                          , TLP.testAll
-                          , TLP.testProc
-                          , TFP.testAll
-                          ]
+-- tests :: TestTree
+-- tests = testGroup "Tests" [ parseTests
+--                           , TE.testAll
+--                           , TLP.testAll
+--                           , TLP.testProc
+--                           , TFP.testAll
+--                           ]
 
 parseTests = testGroup "Parse tests"
   [ testCase "Idents parse" $ testIdent

@@ -1,4 +1,3 @@
-{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE BinaryLiterals #-}
@@ -13,6 +12,9 @@ import           Control.Monad.State
 import           Data.Bits as DB
 import qualified Data.Map as DM
 import           Data.Word
+import           Data.Functor.Identity
+import qualified Text.JSON.Generic as G
+
 import Prelude hiding (and, or, xor)
 
 runStateExceptT :: s -> ExceptT e (StateT s m) a -> m (Either e a, s)
@@ -20,6 +22,11 @@ runStateExceptT s = flip runStateT s . runExceptT
 
 runExceptStateT :: s -> StateT s (ExceptT e m) a -> m (Either e (a, s))
 runExceptStateT s = runExceptT . flip runStateT s
+
+new = Mach mkRegFile 0 mkRam
+
+doMach :: s -> StateT s (ExceptT e Identity) a -> Either e (a, s)
+doMach m f = runIdentity . runExceptStateT m $ f
 
 getReg :: Reg -> Mac Word32
 getReg rx = do
@@ -48,7 +55,7 @@ incPC = do
 getPC :: Mac Word32
 getPC = do
   Mach _ pc _ <- get
-  -- most uses of PC ignore supervisor bit.
+  -- most uses of PC ignore supervisor bit.  
   return (pc .|. 0x80000000)
 
 getSuperPC :: Mac Word32
@@ -73,6 +80,17 @@ setSupervisor b = do
       pc' = pc .|. mask
   put $ Mach rf pc' ram
 
+getSupervisor :: Mac Word32
+getSupervisor = do
+   Mach _ pc _ <- get
+   return pc
+   if DB.testBit pc 31
+     then return 1
+     else return 0
+
+reset :: Mac ()
+reset = put new
+
 store rc lit ra = do
   incPC
   regRA <- getReg ra
@@ -87,14 +105,11 @@ load ra lit rc = do
   val <- getMem ea
   setReg rc val
 
-
 opInst oper rc ra rb = do
   incPC
   rx <- getReg ra
   ry <- getReg rb
   setReg rc (oper (fromIntegral rx) (fromIntegral ry))
-
-
 
 beq ra label rc = do
   pc <- getPC
@@ -164,7 +179,6 @@ simpleOp f rc ra rb = do
   regRA <- getReg ra
   regRB <- getReg rb
   setReg rc (f (fromIntegral regRA) (fromIntegral regRB))
-  
 
 jmp ra rc = do
   incPC
@@ -176,12 +190,18 @@ jmp ra rc = do
 
 loadWords words = do
   Mach rf pc _ <- get
-  put $ Mach rf pc (DM.fromList $ zip [0..] words) 
+  put $ Mach rf pc (DM.fromList $ zip [0, 4 ..] words) 
+
+
+fromWords words = Mach mkRegFile 0 (DM.fromList $ zip [0, 4 ..] words) 
+
+
+
 
 fetch :: Mac Instruction
 fetch = do
   pc <- getPC
-  word <- getMem pc
+  word <- getMem (pc .&. 0x7FFFFFFF)
   decode word
 
 divide c a b = opInst div c a b  
@@ -199,13 +219,17 @@ sra rc ra rb = do
   incPC
   x <- getReg ra
   shiftAmt <- liftM fromIntegral (getReg rb)
-  
   let base = shiftR x shiftAmt
-      mask = if testBit x 31
-             then shiftL 0xFFFFFFFF (31 - shiftAmt)
-             else 0x00000000
-                  
-  setReg rc (fromIntegral (base .|. mask))
+
+  if testBit x 31
+     -- x[31] is 1 so fill left with ones, consider sra by 4, then need
+     -- 1111000 .. 0000
+    then let mask = shiftL 0xFFFFFFFF (31 - shiftAmt)         
+         in setReg rc (fromIntegral (base .|. mask))
+            -- x[31] is 0 so fill left with zeros, consider sra by 4,
+            -- then need 00001111 ..1111
+    else let mask = shiftR 0xFFFFFFFF shiftAmt
+         in setReg rc (fromIntegral (base .&. mask))
   
 runOP :: Instruction -> Mac ()
 runOP inst@(OP (Opcode n) rc ra rb) = do
@@ -228,16 +252,106 @@ runOP inst@(OP (Opcode n) rc ra rb) = do
             _ -> \_ _ _ -> throwError msg
   f rc ra rb
 
-runOPC _ = undefined
+simpleOPC :: (Word32 -> Word32 -> Word32)
+             -> Reg
+             -> Reg
+             -> Word16
+             -> Mac ()
+             
+simpleOPC f rc ra lit = do
+  incPC
+  regRA <- getReg ra
+  setReg rc (f regRA (sxt lit))
 
-run :: Mac ()
-run = do
-  -- fetch an instruction
+divc c l a = simpleOPC div c a l
+mulc c l a = simpleOPC (*) c a l  
+orc c l a = simpleOPC (.|.) c a l
+shlc rc lit ra = do
+  incPC
+  regRA <- getReg ra
+  setReg rc (shiftL regRA (fromIntegral (sxt lit)))
+shrc rc lit ra = do
+  incPC
+  regRA <- getReg ra
+  setReg rc (shiftR regRA (fromIntegral (sxt lit)))
+  
+addc c l a  = simpleOPC (+) c a l
+subc c l a = simpleOPC (-) c a l
+andc c l a = simpleOPC (.&.) c a l
+xorc c l a = simpleOPC DB.xor c a l
+xnorc c l a = simpleOPC (\x y -> DB.complement (DB.xor x y)) c a l
+
+ldr :: Reg -> Word16 -> Mac ()
+ldr rc lit = do
+  pc <- getPC
+  let literal = (lit - (fromIntegral pc)) `div` 4 - 1
+  incPC
+  let ea = pc + (4 * (sxt literal))
+  val <- getMem ea
+  setReg rc val
+
+runOPC :: Instruction -> Mac ()
+runOPC inst@(OPC (Opcode n) rc ra lit) = 
+  let msg = "runOPC finds an invalid instruction: " ++ (show inst)
+  in case n of
+    0x30 -> addc rc lit ra
+    0x38 -> andc rc lit ra
+    0x1C -> beq ra lit rc
+    0x1D -> bne ra lit rc
+    0x34 -> cmpeqc ra lit rc
+    0x36 -> cmplec ra lit rc
+    0x35 -> cmpltc ra lit rc
+    0x33 -> divc rc lit ra
+    0x1B -> jmp ra rc
+    0x18 -> load ra lit rc
+    -- 0x1F -> ldr
+    0x32 -> mulc rc lit ra
+    0x39 -> orc rc lit ra
+    0x3C -> shlc rc lit ra
+    0x3D -> shrc rc lit ra 
+    -- 0x3E -> srac
+    -- 0x19 -> st
+    0x31 -> subc rc lit ra
+    0x3B -> xnorc rc lit ra
+    0x3A -> xorc rc lit ra
+    _ -> throwError msg
+  
+step :: Mac ()
+step = do
   inst <- fetch
   case inst of
     OPC _ _ _ _ -> runOPC inst
-    -- OP _ _ _ _ -> runOP inst
-  
-  return ()
+    OP _ _ _ _ -> runOP inst
 
+stepN n = do
+  if n == 0
+    then return ()
+    else step >> stepN (n - 1)
+
+go :: Mac ()
+go = do
+  pc1 <- getPC
+  step
+  pc2 <- getPC
+  if pc1 == pc2
+    then return ()
+    else go
+  
+
+
+
+jsonState :: Mac G.JSValue
+jsonState = liftM G.toJSON get
+
+loadSample1 :: Mac ()
+loadSample1 = loadWords [ 0xAC000000
+                        , 0xAC000000
+                        , 0xAC000000
+                        , 0xAC000000
+                        , 0xAC000000
+                        , 0xAC000000
+                        , 0xAC000000
+                        , 0xAC000000
+                        ]
+  
 

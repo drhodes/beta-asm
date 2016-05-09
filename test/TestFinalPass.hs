@@ -146,6 +146,7 @@ testFile fname expect =
   do prog <- readFile $ "test/uasm/" ++ fname
      defaultMain $ testIt fname (eraseComments prog) expect
 
+
 testCaseBeta fname expect = testCase fname $ testFileWithBeta fname expect
 
 testFileWithBeta fname expect =

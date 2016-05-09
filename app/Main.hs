@@ -1,7 +1,11 @@
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE ImpredicativeTypes #-}
+{-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 module Main where
 import           Control.Monad.IO.Class
+import           Control.Monad.Trans
 import qualified Text.Parsec as TP
 import           Uasm.Expand
 import           Uasm.FinalPass
@@ -9,61 +13,77 @@ import           Uasm.LabelPass
 import qualified Uasm.Parser as P
 import           Uasm.Types
 import qualified Data.Text.Lazy as T
-import qualified Web.Scotty as WS
+import qualified Web.Scotty as W
 import           Data.Bits
+import qualified Beta.Mach as BM
+import           Web.Scotty.Trans
+import           Control.Monad
+import           Control.Monad.Except
+import           Control.Monad.Identity
+import           Control.Monad.State
+import           Control.Monad.Trans.Except
+import           Beta.Types
+import qualified Control.Concurrent.MVar as M
+import qualified Text.JSON as JSON
+import qualified Text.JSON.Generic as G
+import           Data.Word
+import           Beta.Util
+
+withVar var f = do
+  machine <- liftIO $ M.takeMVar var
+  case BM.doMach machine f of
+    Right (rsp, next) -> do
+      liftIO $ M.putMVar var next
+      W.text $ T.pack (JSON.encode ("OK"::String, rsp))
+    Left msg -> do
+      liftIO $ M.putMVar var machine
+      W.text $ T.pack (JSON.encode ("ERR"::String, msg))
+
+say s = liftIO $ putStrLn s
 
 main = do
   print "ok"
+
   putStrLn "BETA server starting..."
-  WS.scotty 3000 $ do
-    -- reset the CPU
-    WS.get "/reset" $ do
-      liftIO $ putStrLn "Resetting the CPU"
-      WS.text "Resetting the CPU"
 
-    WS.get "/assemble/:filename" $ do
-      fn <- WS.param "filename"
-      x <- liftIO $ assemble fn
-      WS.text $ T.pack (show x)
+  m <- M.newMVar BM.new
+  
+  
+  W.scotty 3000 $ do {
+    --------------------------------------------
+    ; W.get "/reset" $ do {
+        ; say "beta:  Resetting the CPU"
+        ; W.text "Resetting the CPU"
+        ; withVar m BM.reset
+        }
 
-padBytes bs = if length bs `mod` 4 == 0
-              then bs
-              else padBytes $ bs ++ [0]
-                   
-groupBytes [] = []
-groupBytes bs = (littlize $ take 4 bs) : groupBytes (drop 4 bs)
+    ; W.get "/step" $ do {
+        ; say "beta:  Stepping the CPU"
+        ; W.text $ T.pack (JSON.encode ( "OK"::String
+                                       , "Stepping the CPU"::String))
+        ; withVar m BM.step
+        }
 
-littlize [d, c, b, a] =
-  let a' = shiftL a 24
-      b' = shiftL b 16
-      c' = shiftL c 8
-      d' = shiftL d 0
-  in d' .|. c' .|. b' .|. a'
+    ; W.get "/state" $ do {
+        ; let msg = "beta:  Retrieving CPU state"
+        ; say msg
+        ; withVar m BM.jsonState
+        }
 
-toBinary vals =
-  let bytes = padBytes [n | (ValNum n) <- vals]
-  in groupBytes bytes
+    ; W.get "/assemble/:filename" $ do {
+        ; fn <- W.param "filename"
+        ; say $ "beta:  Assembling " ++ fn
+        ; x <- liftIO $ assemble fn
+        ; W.text $ T.pack (show x)
+        }
 
-assemble fname =
-  do beta <- readFile "test/uasm/beta.uasm"
-     prog <- readFile $ "test/uasm/" ++ fname
-     let src = P.eraseComments $ beta ++ "\n" ++ prog
-     let result = doFinalPass src
-     return result
+    ; W.post "/load" $ do {
+        ; x <- param "program"
+        ; W.text $ x
+        }
 
-doFinalPass src = 
-  do labelPassResult <- doLabelPass src
-     case labelPassResult of
-       (Right (vals, _)) -> runFinalPass vals
-       (Left msg) -> error msg
-
-doLabelPass :: Monad m => String -> m (Either String ([Value], PlaceState))
-doLabelPass prog = do  
-  case TP.parse (TP.many P.topLevel <* TP.eof) "" prog of
-    (Right tops) ->
-       case expand expandTopLevels tops of
-         (Right (topLevels, _)) ->
-           return $ runLabelPass labelPassStmts (flattenTops topLevels) 
-         (Left msg) -> error msg
-    (Left msg) -> error (show msg)
+    ; W.get "/load-sample" $ do {
+        ; withVar m BM.loadSample1
+        }
+    }
 
