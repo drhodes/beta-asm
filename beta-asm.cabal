@@ -28,6 +28,7 @@ library
                      , Beta.Types
                      , Beta.Decoder
                      , Beta.Util
+                     , Beta.Err
                           
   build-depends:       GenericPretty >= 1.2.1
                      , base >= 4.7 && < 5

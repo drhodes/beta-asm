@@ -6,6 +6,7 @@ module Beta.Mach where
 
 import           Beta.Decoder
 import           Beta.Types
+import           Beta.Err
 import           Control.Monad
 import           Control.Monad.Except
 import           Control.Monad.State
@@ -15,10 +16,6 @@ import           Data.Word
 import           Data.Functor.Identity
 import qualified Text.JSON.Generic as G
 import Prelude hiding (and, or, xor)
-
-{-
-
--}
 
 
 runStateExceptT :: s -> ExceptT e (StateT s m) a -> m (Either e a, s)
@@ -86,7 +83,8 @@ reset = put new
 ld ra lit rc = do
   -- Reg[Rc] ← Mem[Reg[Ra] + SEXT(literal)]
   regRA <- getReg ra
-  val <- getMem $ regRA + sxt lit
+  val <- (getMem $ regRA + sxt lit)
+    ? "Can't LD: " ++ (show (ra, lit, rc))
   setReg rc val
 
 opInst oper rc ra rb = do
@@ -183,10 +181,12 @@ loadWords words = do
 
 fetch :: Mac Instruction
 fetch = do
-  pc <- getPC
+  pc <- getPC 
   word <- getMem (pc .&. 0x7FFFFFFF)
+    ? "Mach.fetch can't mem at program counter: " ++ show pc
   decode word
-
+    ? "Mach.fetch can't decode word: " ++ show word
+    
 divide c a b = opInst div c a b  
 mul c a b = opInst (*) c a b  
 or c a b = opInst (.|.) c a b  
@@ -298,24 +298,26 @@ runOPC inst@(OPC (Opcode n) rc ra lit) =
     0x3B -> xnorc rc lit ra
     0x3A -> xorc rc lit ra
     _ -> throwError msg
-  
+
+    
 step :: Mac ()
-step = do
-  inst <- fetch
+step = do 
+  inst <- fetch ? "can't step"
   case inst of
-    OPC _ _ _ _ -> runOPC inst
-    OP _ _ _ _ -> runOP inst
+      OPC _ _ _ _ -> runOPC inst
+      OP _ _ _ _ -> runOP inst
 
 stepN n = do
   if n == 0
     then return ()
-    else step >> stepN (n - 1)
+    else do step ? ("step failed with this many to go: " ++ (show n))
+            stepN (n - 1)
 
 go :: Mac ()
 go = do
-  pc1 <- getPC
+  pc1 <- getPC ? "Can't Mach.go"
   step
-  pc2 <- getPC
+  pc2 <- getPC ? "Can't Mach.go"
   if pc1 == pc2
     then return ()
     else go

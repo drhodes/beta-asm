@@ -1,3 +1,4 @@
+{-# LANGUAGE FlexibleContexts #-}
 module Beta.Util where
 
 import           Control.Monad.IO.Class
@@ -21,6 +22,8 @@ import qualified Control.Concurrent.MVar as M
 import qualified Text.JSON as JSON
 import qualified Text.JSON.Generic as G
 import           Data.Word
+import           Beta.Err
+
 
 padBytes bs = if length bs `mod` 4 == 0
               then bs
