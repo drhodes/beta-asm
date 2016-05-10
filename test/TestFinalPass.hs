@@ -130,6 +130,31 @@ testAll = testGroup "TestLabelPass.hs"
                                             , 0x6ffc0000
                                             ]
       
+    , testCaseBeta "test7.uasm" $ hexify [ 0xc0000002
+                                         , 0x6fec0000
+                                         , 0x80000000
+                                         , 0x80000000
+                                         ]
+    , testCaseBeta "test8.uasm" $ hexify [ 0xc0000002
+                                         , 0x73ff0001
+                                         , 0x80000000
+                                         , 0x80000000
+                                         ]
+
+      
+-- testMach7 = testCaseReg0
+--   3
+--   (unlines [ "ADDC(0, 2, 0)"
+--            , "JMP(myLabel, r0)"
+--            , "ADD(0, 0, 0)" 
+--            , "myLabel:"
+--            , "ADD(0, 0, 0)"
+--            ])
+--   4
+
+           
+
+      
     ]
   
 --------------------------------------------

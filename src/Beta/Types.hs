@@ -21,6 +21,7 @@ import qualified Text.PrettyPrint.Leijen as PP
 import           Uasm.Pretty
 import qualified Uasm.SymbolTable as SymTab
 import           Uasm.Types
+
 data Mnemonic = ADD | ADDC | AND | ANDC | BEQ | BNE | CMPEQ 
               | CMPEQC | CMPLE | CMPLEC | CMPLT | CMPLTC | DIV 
               | DIVC | JMP | LD | LDR | MUL | MULC 
@@ -43,7 +44,7 @@ bp = R27
 data Lit = Lit Word16
            deriving (Show, Eq, Typeable, Data)
 
-data Opcode = Opcode Int
+data Opcode = Opcode Word32
             deriving (Show, Eq, Typeable, Data)
 
 mkOpcode n = Opcode $ n DB..&. 0b111111

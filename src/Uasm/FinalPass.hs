@@ -134,7 +134,7 @@ instance Eval Expr where
            case val of
              (ValNum n) -> let term' = TermLitNum (LitNum n)
                            in eval (ExprTermExpr term' xs)
-             _ -> throwError $ "Weird Val in eval: " ++ show val
+             _ -> throwError $ "FinalPass.eval: unexpected val: " ++ show val
       casex -> throwError $ "Unhandled Eval expr: " ++ show casex
 
   eval (ExprBinTail binop term) = throwError ("Binop Crap! " ++ show (binop, term))

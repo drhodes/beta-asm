@@ -14,8 +14,13 @@ import qualified Data.Map as DM
 import           Data.Word
 import           Data.Functor.Identity
 import qualified Text.JSON.Generic as G
-
+import Numeric (showIntAtBase)
 import Prelude hiding (and, or, xor)
+
+{-
+
+-}
+
 
 runStateExceptT :: s -> ExceptT e (StateT s m) a -> m (Either e a, s)
 runStateExceptT s = flip runStateT s . runExceptT
@@ -24,6 +29,8 @@ runExceptStateT :: s -> StateT s (ExceptT e m) a -> m (Either e (a, s))
 runExceptStateT s = runExceptT . flip runStateT s
 
 new = Mach mkRegFile 0 mkRam
+fromWords words = Mach mkRegFile 0 (DM.fromList $ zip [0, 4 ..] words) 
+
 
 doMach :: s -> StateT s (ExceptT e Identity) a -> Either e (a, s)
 doMach m f = runIdentity . runExceptStateT m $ f
@@ -53,15 +60,7 @@ incPC = do
   put (Mach rf (pc + 4) ram)
 
 getPC :: Mac Word32
-getPC = do
-  Mach _ pc _ <- get
-  -- most uses of PC ignore supervisor bit.  
-  return (pc .|. 0x80000000)
-
-getSuperPC :: Mac Word32
-getSuperPC = do
-  Mach _ pc _ <- get  
-  return pc
+getPC = cpuPC <$> get
   
 setPC pc = do
   Mach rf _ ram <- get
@@ -74,20 +73,6 @@ getMem addr = do
     Just n -> return n
     Nothing -> throwError $ "Invalid Address: " ++ (show addr)
 
-setSupervisor b = do
-  Mach rf pc ram <- get
-  let mask = 0x80000000
-      pc' = pc .|. mask
-  put $ Mach rf pc' ram
-
-getSupervisor :: Mac Word32
-getSupervisor = do
-   Mach _ pc _ <- get
-   return pc
-   if DB.testBit pc 31
-     then return 1
-     else return 0
-
 reset :: Mac ()
 reset = put new
 
@@ -98,11 +83,10 @@ store rc lit ra = do
   regRC <- getReg rc
   setMem ea regRC
 
-load ra lit rc = do
-  incPC
+ld ra lit rc = do
+  -- Reg[Rc] ← Mem[Reg[Ra] + SEXT(literal)]
   regRA <- getReg ra
-  let ea = regRA + sxt lit
-  val <- getMem ea
+  val <- getMem $ regRA + sxt lit
   setReg rc val
 
 opInst oper rc ra rb = do
@@ -111,23 +95,24 @@ opInst oper rc ra rb = do
   ry <- getReg rb
   setReg rc (oper (fromIntegral rx) (fromIntegral ry))
 
-beq ra label rc = do
+beq ra lit rc = do
+  -- Reg[Rc] ← PC + 4; if Reg[Ra] = 0 then PC ← PC + 4 + 4*SEXT(literal)
   pc <- getPC
-  let literal = (label - (fromIntegral pc)) - 1
-  incPC
-  let ea = pc + 4 * (sxt (fromIntegral literal))
-  temp <- getReg ra
   setReg rc pc
-  when (temp == 0) $ setPC ea
+  regRA <- getReg ra
+  when (regRA == 0) $ setPC (pc + 4 + 4 * sxt(lit))
+  
+bne ra lit rc = do
+  pc <- getPC
+  setReg rc (pc + 4)
+  regRA <- getReg ra
+  when (regRA /= 0) $ setPC (pc + 4 + 4 * sxt(lit))
 
-bne ra label rc = do
-  pc <- getPC
-  let literal = (label - (fromIntegral pc)) - 1
-  incPC
-  let ea = pc + 4 * (sxt (fromIntegral literal))
-  temp <- getReg ra
-  setReg rc pc
-  when (temp /= 0) $ setPC ea
+st rc lit ra = do
+  -- Mem[Reg[Ra] + SEXT(literal)] ← Reg[Rc]
+  regRa <- getReg ra
+  regRc <- getReg rc
+  setMem (regRa + sxt lit) regRc
 
 cmpeq rc ra rb = do
   incPC
@@ -192,8 +177,6 @@ loadWords words = do
   Mach rf pc _ <- get
   put $ Mach rf pc (DM.fromList $ zip [0, 4 ..] words) 
 
-
-fromWords words = Mach mkRegFile 0 (DM.fromList $ zip [0, 4 ..] words) 
 
 
 
@@ -303,7 +286,7 @@ runOPC inst@(OPC (Opcode n) rc ra lit) =
     0x35 -> cmpltc ra lit rc
     0x33 -> divc rc lit ra
     0x1B -> jmp ra rc
-    0x18 -> load ra lit rc
+    0x18 -> ld ra lit rc
     -- 0x1F -> ldr
     0x32 -> mulc rc lit ra
     0x39 -> orc rc lit ra

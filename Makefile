@@ -3,7 +3,8 @@ build: ## build
 	echo stack build
 
 test: FORCE ## test
-	stack test --ghc-options -fprof-auto --test-arguments +RTS -N -RTS '--hide-successes'
+	stack test --ghc-options -fprof-auto --test-arguments +RTS -N -RTS \
+	'--hide-successes -j8'
 	stack install
 
 clean: FORCE ## clean all the things

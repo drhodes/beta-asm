@@ -51,7 +51,13 @@ decode word =
 
 
 test1 = bitRange 0b000111000 5 3 == 7
-test2 = bitRange 0b001111000 6 3 == 15
+test2 = bitRange 0b001111000 6 3 == 15 
+test3 = bitRange 0b11111111111111000 4 2 == 6
+
+
+
+
+
   
 -- mnemonicToOpcode m =
 --   case m of

@@ -1,0 +1,5 @@
+ADDC(0, 2, 0)
+BR(myLabel)
+ADD(0, 0, 0)
+myLabel:
+ADD(0, 0, 0)

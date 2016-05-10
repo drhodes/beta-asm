@@ -25,6 +25,7 @@ testAll = testGroup "TestMach.hs"
   , testMach5
   , testMach6
   , testMach7
+  , testMach8
   ]
 
   
@@ -41,21 +42,22 @@ testMachReg0 numSteps str expect = do
     Right words -> do
       let mach = Mach.fromWords (BU.toBinary words)
       case Mach.doMach mach (Mach.stepN numSteps) of
-        Left msg -> error msg
+        Left msg -> error $ "Stepping fails: " ++ msg
         Right (_, m) -> 
           case DM.lookup R0 (cpuRegFile m) of
             Nothing -> error "Reg0 not found in testcase, should not happen"
             Just v -> when (v /= expect) $
-              error $ "expected value not found: " ++ (show v)
+              error $ unlines [ "     GOT: " ++ show v
+                              , "EXPECTED: " ++ show expect]
 
 
-testCaseReg0 numSteps src expect = do
-  testCase src $ testMachReg0 numSteps src expect
+testCaseReg0 name numSteps src expect = do
+  testCase name $ testMachReg0 numSteps src expect
 
-testMach1 = testCaseReg0 1 "ADDC(0, 3, 0)" 3
-testMach2 = testCaseReg0 2 "ADDC(0, 2, 0) ADDC(0, 2, 0)" 4
-testMach3 = testCaseReg0 2 "ADDC(0, 2, 0) ADD(0, 0, 0)" 4
-testMach4 = testCaseReg0
+testMach1 = testCaseReg0 "mach1" 1 "ADDC(0, 3, 0)" 3
+testMach2 = testCaseReg0 "mach2" 2 "ADDC(0, 2, 0) ADDC(0, 2, 0)" 4
+testMach3 = testCaseReg0 "mach3" 2 "ADDC(0, 2, 0) ADD(0, 0, 0)" 4
+testMach4 = testCaseReg0 "mach4"
   3
   (unlines [ "ADDC(0, 2, 0)"
            , "ADD(0, 0, 0)"
@@ -63,7 +65,7 @@ testMach4 = testCaseReg0
            ])
   8
 
-testMach5 = testCaseReg0
+testMach5 = testCaseReg0 "mach5"
   3
   (unlines [ "ADDC(0, 2, 0)"
            , "myLabel:"
@@ -71,25 +73,36 @@ testMach5 = testCaseReg0
            , "ADD(0, 0, 0)"
            ])
   8
-
-testMach6 = testCaseReg0
-  3
-  (unlines [ "ADDC(0, 2, 0)"
+  
+testMach6 = testCaseReg0 "mach6"
+  4
+  (unlines [ "ADDC(0, 60, 0)"
            , "JMP(myLabel)"
-           , "ADD(0, 0, 0)" 
+           , "ADD(0, 30, 0)" 
            , "myLabel:"
-           , "ADD(0, 0, 0)"
+           , "ADDC(0, 0, 0)"
            ])
-  4
+  120
 
-testMach7 = testCaseReg0
+
+
+testMach7 = testCaseReg0 "mach7"
   3
   (unlines [ "ADDC(0, 2, 0)"
-           , "JMP(myLabel, r0)"
+           , "JMP(r0, myLabel)"
            , "ADD(0, 0, 0)" 
            , "myLabel:"
            , "ADD(0, 0, 0)"
            ])
   4
 
-           
+
+testMach8 = testCaseReg0 "mach8"
+  3
+  (unlines [ "ADDC(0, 2, 0)"
+           , "BR(myLabel)"
+           , "ADD(0, 0, 0)" 
+           , "myLabel:"
+           , "ADD(0, 0, 0)"
+           ])
+  4
