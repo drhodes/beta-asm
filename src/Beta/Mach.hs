@@ -14,7 +14,6 @@ import qualified Data.Map as DM
 import           Data.Word
 import           Data.Functor.Identity
 import qualified Text.JSON.Generic as G
-import Numeric (showIntAtBase)
 import Prelude hiding (and, or, xor)
 
 {-
@@ -29,6 +28,7 @@ runExceptStateT :: s -> StateT s (ExceptT e m) a -> m (Either e (a, s))
 runExceptStateT s = runExceptT . flip runStateT s
 
 new = Mach mkRegFile 0 mkRam
+
 fromWords words = Mach mkRegFile 0 (DM.fromList $ zip [0, 4 ..] words) 
 
 
@@ -68,7 +68,7 @@ setPC pc = do
 
 getMem :: Word32 -> Mac Word32
 getMem addr = do
-  Mach rf pc ram <- get
+  Mach _ _ ram <- get
   case DM.lookup addr ram of
     Just n -> return n
     Nothing -> throwError $ "Invalid Address: " ++ (show addr)
@@ -76,12 +76,12 @@ getMem addr = do
 reset :: Mac ()
 reset = put new
 
-store rc lit ra = do
-  incPC
-  regRA <- getReg ra
-  let ea = regRA + sxt lit
-  regRC <- getReg rc
-  setMem ea regRC
+-- store rc lit ra = do
+--   incPC
+--   regRA <- getReg ra
+--   let ea = regRA + sxt lit
+--   regRC <- getReg rc
+--   setMem ea regRC
 
 ld ra lit rc = do
   -- Reg[Rc] ← Mem[Reg[Ra] + SEXT(literal)]
@@ -133,7 +133,7 @@ cmple rc ra rb = do
   incPC
   regRa <- getReg ra
   regRb <- getReg rb
-  if ra <= rb
+  if regRa <= regRb
     then setReg rc 1
     else setReg rc 0
 
@@ -287,13 +287,13 @@ runOPC inst@(OPC (Opcode n) rc ra lit) =
     0x33 -> divc rc lit ra
     0x1B -> jmp ra rc
     0x18 -> ld ra lit rc
-    -- 0x1F -> ldr
+    0x1F -> ldr rc lit
     0x32 -> mulc rc lit ra
     0x39 -> orc rc lit ra
     0x3C -> shlc rc lit ra
     0x3D -> shrc rc lit ra 
     -- 0x3E -> srac
-    -- 0x19 -> st
+    0x19 -> st rc lit ra
     0x31 -> subc rc lit ra
     0x3B -> xnorc rc lit ra
     0x3A -> xorc rc lit ra
@@ -319,9 +319,6 @@ go = do
   if pc1 == pc2
     then return ()
     else go
-  
-
-
 
 jsonState :: Mac G.JSValue
 jsonState = liftM G.toJSON get
