@@ -26,8 +26,8 @@ runExceptStateT s = runExceptT . flip runStateT s
 
 new = Mach mkRegFile 0 mkRam
 
+fromWords :: [Word32] -> Mach
 fromWords words = Mach mkRegFile 0 (DM.fromList $ zip [0, 4 ..] words) 
-
 
 doMach :: s -> StateT s (ExceptT e Identity) a -> Either e (a, s)
 doMach m f = runIdentity . runExceptStateT m $ f
@@ -174,9 +174,6 @@ jmp ra rc = do
 loadWords words = do
   Mach rf pc _ <- get
   put $ Mach rf pc (DM.fromList $ zip [0, 4 ..] words) 
-
-
-
 
 
 fetch :: Mac Instruction

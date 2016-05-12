@@ -79,7 +79,8 @@ data Mach = Mach { cpuRegFile :: RegFile
 type Mac b = forall m. ( MonadState Mach m,
                          MonadError String m ) => m b
 
-                          
+
+machNew = Mach mkRegFile 0 mkRam
                       
  
 

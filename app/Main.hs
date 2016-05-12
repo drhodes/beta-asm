@@ -27,18 +27,26 @@ import qualified Control.Concurrent.MVar as M
 import qualified Text.JSON as JSON
 import qualified Text.JSON.Generic as G
 import           Data.Word
-import           Beta.Util
+import qualified Beta.Util as BU
+
+
+storeMach var m = liftIO $ M.putMVar var m
+takeMach var = liftIO $ M.takeMVar var 
+
+
+ok x = W.text $ T.pack $ G.encodeJSON ("OK"::String, x)
+err msg = W.text $ T.pack $ JSON.encode ("ERR"::String, msg)
 
 withVar var f = do
-  machine <- liftIO $ M.takeMVar var
+  machine <- takeMach var
   case BM.doMach machine f of
     Right (rsp, next) -> do
-      liftIO $ M.putMVar var next
-      W.text $ T.pack (JSON.encode ("OK"::String, rsp))
-    Left msg -> do
-      liftIO $ M.putMVar var machine
-      W.text $ T.pack (JSON.encode ("ERR"::String, msg))
-
+      ok rsp
+      storeMach var next
+    Left msg -> do      
+      err msg
+      storeMach var machine
+      
 say s = liftIO $ putStrLn s
 
 main = do
@@ -46,8 +54,8 @@ main = do
 
   putStrLn "BETA server starting..."
 
+  -- mutable state for machine.
   m <- M.newMVar BM.new
-  
   
   W.scotty 3000 $ do {
     --------------------------------------------
@@ -59,31 +67,46 @@ main = do
 
     ; W.get "/step" $ do {
         ; say "beta:  Stepping the CPU"
-        ; W.text $ T.pack (JSON.encode ( "OK"::String
-                                       , "Stepping the CPU"::String))
         ; withVar m BM.step
+        ; ok ("Stepping the CPU" :: String)
         }
 
     ; W.get "/state" $ do {
         ; let msg = "beta:  Retrieving CPU state"
-        ; say msg
-        ; withVar m BM.jsonState
+        ; v <- takeMach m
+        ; ok v
+        ; storeMach m v
         }
 
     ; W.get "/assemble/:filename" $ do {
         ; fn <- W.param "filename"
         ; say $ "beta:  Assembling " ++ fn
-        ; x <- liftIO $ assemble fn
+        ; x <- liftIO $ BU.assemble fn
         ; W.text $ T.pack (show x)
         }
 
-    ; W.post "/load" $ do {
-        ; x <- param "program"
-        ; W.text $ x
-        }
-
+    ; W.post "/load-buffer" (postLoadBuffer m)
+      
     ; W.get "/load-sample" $ do {
         ; withVar m BM.loadSample1
         }
     }
 
+postLoadBuffer :: M.MVar Mach -> ActionT T.Text IO ()
+postLoadBuffer m = do
+  -- lost post data
+  name <- W.param "buffer-name"
+  say $ "beta: Loading buffer: " ++ name
+  
+  src <- W.param "buffer-src"
+  say $ "beta: Loading src   : " ++ (take 40 src)
+
+  -- assemble the buffer.
+  words <- liftIO $ BU.assembleString src
+  
+  case words of
+    Left msg -> err msg
+    Right ws -> do
+      takeMach m
+      storeMach m (BM.fromWords ws)
+      ok ("ASDFASDF has spoken" :: String)

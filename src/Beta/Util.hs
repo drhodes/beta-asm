@@ -42,6 +42,7 @@ toBinary vals =
   let bytes = padBytes [fromIntegral n :: Word32 | (ValNum n) <- vals]
   in groupBytes bytes
 
+assemble :: [Char] -> IO (Either [Char] [Value])
 assemble fname =
   do beta <- readFile "test/uasm/beta.uasm"
      prog <- readFile $ "test/uasm/" ++ fname
@@ -49,11 +50,11 @@ assemble fname =
      let result = doFinalPass src
      return result
 
-assembleString :: String -> IO (Either String [Value])
+assembleString :: String -> IO (Either String [Word32])
 assembleString s = do
   beta <- readFile "test/uasm/beta.uasm"
   let src = P.eraseComments $ beta ++ "\n" ++ s
-  return $ doFinalPass src
+  return $ liftM toBinary $ doFinalPass src
 
 doFinalPass src = 
   do labelPassResult <- doLabelPass src
