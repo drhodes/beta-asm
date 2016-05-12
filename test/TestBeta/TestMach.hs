@@ -25,7 +25,7 @@ testMachReg0 numSteps str expect = do
   case result of
     Left msg -> error msg
     Right words -> do
-      let mach = Mach.fromWords words
+      let mach = Mach.fromWordPos words
       case Mach.doMach mach (Mach.stepN numSteps) of
         Left msg -> error $ "Stepping fails: " ++ msg
         Right (_, m) -> 

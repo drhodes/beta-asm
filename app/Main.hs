@@ -85,12 +85,17 @@ main = do
         ; W.text $ T.pack (show x)
         }
 
-    ; W.post "/load-buffer" (postLoadBuffer m)
-      
-    ; W.get "/load-sample" $ do {
-        ; withVar m BM.loadSample1
+    ; W.get "/get-current-pos" $ do {
+        ; mach <- takeMach m
+        ; storeMach m mach
+        ; pos <- withVar m BM.currentPos 
+        ; say $ "beta:  Getting Position:" ++ (show mach)
+        ; ok pos
         }
+
+    ; W.post "/load-buffer" (postLoadBuffer m)
     }
+
 
 postLoadBuffer :: M.MVar Mach -> ActionT T.Text IO ()
 postLoadBuffer m = do
@@ -108,5 +113,5 @@ postLoadBuffer m = do
     Left msg -> err msg
     Right ws -> do
       takeMach m
-      storeMach m (BM.fromWords ws)
+      storeMach m (BM.fromWordPos ws)
       ok ("ASDFASDF has spoken" :: String)

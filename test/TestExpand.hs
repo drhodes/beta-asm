@@ -48,7 +48,7 @@ testExpand prog expect = do
       do case uniRunExpand tops of
            (Right topLevels) ->
              let result = flattenTops topLevels
-             in if result == expect
+             in if (map fst result) == expect
                 then do return () 
                 else do putStrLn "\nFail"
                         putStrLn prog

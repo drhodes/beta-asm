@@ -6,6 +6,7 @@ import           Text.Parsec.String
 
 import           Uasm.Types
 
+
 spacex = do many (char ' ' <|> char '\t')
             return ()
 
@@ -325,14 +326,16 @@ macroBody2 = do
 topLevel = try topLevel2 <|> try topLevel1
 
 topLevel1 = do spaces
+               pos <- getPosition
                s <- stmt
                spaces
-               return (TopStmt s)
+               return (TopStmt s pos)
                
 topLevel2 = do spaces
+               pos <- getPosition
                m <- macro
                spaces
-               return (TopMacro m)
+               return (TopMacro m pos)
 
 sourceFile = many topLevel <* eof
 

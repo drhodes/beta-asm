@@ -14,49 +14,49 @@ unitTests = testGroup "Unit tests"
 
 testAll = testGroup "TestLabelPass.hs"
   [ --------------------------------------------
-    testCase "test1" $ testLabelPass "."
+    testCase "testLabel1" $ testLabelPass "."
     [ValNum 0]
 
     --------------------------------------------
-  , testCase "test2" $ testLabelPass ". ."
+  , testCase "testLabel2" $ testLabelPass ". ."
     [ValNum 0, ValNum 1]
     
     --------------------------------------------
-  , testCase "test3" $ testLabelPass ".\n."
+  , testCase "testLabel3" $ testLabelPass ".\n."
     [ValNum 0, ValNum 1]
     
 
     --------------------------------------------
-  , testCase "test4" $ testLabelPass ".."
+  , testCase "testLabel4" $ testLabelPass ".."
     [ValNum 0, ValNum 1]
 
     --------------------------------------------
-  , testCase "test5" $ testLabelPass ".=4"    
+  , testCase "testLabel5" $ testLabelPass ".=4"    
     [ ValSeq [ValNum 0, ValNum 0, ValNum 0, ValNum 0]
     ]
     
     --------------------------------------------
-  , testCase "test6" $ testLabelPass ".=4 ."    
+  , testCase "testLabel6" $ testLabelPass ".=4 ."    
     [ ValSeq [ValNum 0, ValNum 0, ValNum 0, ValNum 0]
     , ValNum 4
     ]
     
     --------------------------------------------
-  , testCase "test7" $ testLabelPass "a=3 .=a ."    
+  , testCase "testLabel7" $ testLabelPass "a=3 .=a ."    
     [ ValNop
     , ValSeq [ValNum 0, ValNum 0, ValNum 0]
     , ValNum 3
     ]
 
     --------------------------------------------
-  , testCase "test8" $ testLabelPass ". myLabel: \n  myLabel"    
+  , testCase "testLabel8" $ testLabelPass ". myLabel: \n  myLabel"    
     [ ValNum 0
     , ValProc (Label (Ident "myLabel"))
     , ValNum 1
     ]
     
     --------------------------------------------
-  , testCase "test9" $ testLabelPass ". myLabel: \n  myLabel"    
+  , testCase "testLabel9" $ testLabelPass ". myLabel: \n  myLabel"    
     [ ValNum 0
     , ValProc (Label (Ident "myLabel"))
     , ValNum 1
@@ -64,7 +64,7 @@ testAll = testGroup "TestLabelPass.hs"
 
     --------------------------------------------
     -- planned error
-    -- , testCase "test10" $ testLabelPass ". + myLabel \n myLabel:"
+    -- , testCase "testLabel10" $ testLabelPass ". + myLabel \n myLabel:"
 
   , testIt "test11"
     ". \n myLabel: \n  myLabel"
@@ -206,7 +206,7 @@ testAll = testGroup "TestLabelPass.hs"
 testProc = testGroup "TestLabelPass.hs Procs"
   [
     --------------------------------------------
-    testCase "testProc1" $ testLabelPass
+    testCase "testLabelProc1" $ testLabelPass
     (unlines [ "1 2"
              , ".align 4"
              , "3"
@@ -218,7 +218,7 @@ testProc = testGroup "TestLabelPass.hs Procs"
     ]
     
     --------------------------------------------
-  , testCase "testProc2" $ testLabelPass
+  , testCase "testLabelProc2" $ testLabelPass
     (unlines [ ".ascii \"ABCD\""
              ])
     [ ValSeq [ ValNum 0x41
@@ -229,7 +229,7 @@ testProc = testGroup "TestLabelPass.hs Procs"
     ]
 
     --------------------------------------------
-  , testCase "testProc2" $ testLabelPass
+  , testCase "testLabelProc2" $ testLabelPass
     (unlines [ ".text \"ABCD\""
              ])
     [ ValSeq [ ValNum 0x41
@@ -262,7 +262,7 @@ testLabelPass prog expect = do
          (Right topLevels) ->
            case uniLabelPass (flattenTops topLevels) of
              Right result ->
-               if result == expect
+               if (map fst result) == expect
                then do return () 
                else do let trunc x = putStrLn $ take 2000 $ show x
                        putStrLn "\nFail"
@@ -277,4 +277,3 @@ testLabelPass prog expect = do
              Left msg -> error msg
          (Left msg) -> error msg
     (Left msg) -> error (show msg)
-

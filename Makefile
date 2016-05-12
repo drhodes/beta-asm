@@ -4,7 +4,7 @@ build: ## build
 
 test: FORCE ## test
 	stack test --ghc-options -fprof-auto --test-arguments +RTS -N -RTS \
-	'--hide-successes -j8'
+	'--hide-successes'
 	stack install
 
 clean: FORCE ## clean all the things

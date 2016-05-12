@@ -13,6 +13,7 @@ import qualified Text.PrettyPrint.Leijen as PP
 import Uasm.Pretty
 import           Uasm.Types
 import qualified Data.Char as DC
+import           Text.Parsec
 
 {-
 Macros have been expanded.  Label addresses are unknown because
@@ -32,8 +33,6 @@ that point.
 
 The value table contains 
 -}
-
--- move this into Uasm.PlaceState or something.
 
 type ValueTable = DM.Map Ident Value
 
@@ -100,28 +99,34 @@ runExceptStateT s = runExceptT . flip runStateT s
 runLabelPass :: (t -> StateT PlaceState (ExceptT e Identity) a)
              -> t
              -> Either e (a, PlaceState)
-             
 runLabelPass func node = runIdentity . runExceptStateT (newPlaceState) $ func node
 
-uniLabelPass :: [Stmt] -> Either String [Value]
-uniLabelPass nodes = liftM fst $ runLabelPass labelPassStmts nodes
+-- uniLabelPass :: [(Pos, Stmt)] -> Either String [(Pos, Value)]
+
+uniLabelPass :: [(Stmt, SourcePos)] -> Either String [(Value, SourcePos)]
+uniLabelPass nodes = do (x, _) <- runLabelPass labelPassStmts nodes
+                        return x
+
+withPos f p = do x <- f
+                 return (x, p)
 
 --------------------------------------------
+labelPassStmts :: [(Stmt, SourcePos)] -> LabelPass [(Value, SourcePos)]
 labelPassStmts stmts = mapM labelPassStmt stmts
 
-labelPassStmt :: Stmt -> LabelPass Value
-labelPassStmt (StmtProc p) = labelPassProc p
-labelPassStmt (StmtCall _) = throwError $
+labelPassStmt :: (Stmt, SourcePos) -> LabelPass (Value, SourcePos)
+labelPassStmt (StmtProc p, pos) = withPos (labelPassProc p) pos
+labelPassStmt (StmtCall _, pos) = throwError $
   "labelPassStmt shouldn't handle any macro calls, \ 
   \they should have been flattened alreadu in Uasm.Expand"
 
-labelPassStmt (StmtAssn assn) = labelPassAssn assn
-labelPassStmt (StmtExpr expr) =
+labelPassStmt (StmtAssn assn, pos) = withPos (labelPassAssn assn) pos
+labelPassStmt (StmtExpr expr, pos) =
   do x <- eval expr
      psIncCurAddr
-     return x
+     return (x, pos)
             
-labelPassStmt (StmtMany _) = throwError $
+labelPassStmt (StmtMany _ , pos) = throwError $
   "label pass shouldn't handle StmtMany. \
   \StmtMany should have already been \
   \flattened out in Uasm.Expand.flattenStmt"

@@ -10,6 +10,7 @@ import           Data.Functor.Identity
 import qualified Uasm.SymbolTable as SymTab
 import           Uasm.Types
 import Control.Monad.Except
+import           Text.Parsec
 
 type ExpandErr b = forall m. ( MonadState SymbolTable m,
                                MonadError String m ) => m b
@@ -28,10 +29,11 @@ uniRunExpand :: [TopLevel] -> Either [Char] [TopLevel]
 uniRunExpand nodes = fst <$> expand expandTopLevels nodes
 
 
-flattenTops :: [TopLevel] -> [Stmt]
+flattenTops :: [TopLevel] -> [(Stmt, SourcePos)]
 flattenTops [] = []
-flattenTops ((TopStmt stmt):rest) = flattenStmt stmt ++ (flattenTops rest)
-flattenTops ((TopMacro _):rest) = flattenTops rest
+flattenTops ((TopStmt stmt pos):rest) =
+  [(s, pos) | s <- (flattenStmt stmt)] ++ (flattenTops rest)
+flattenTops ((TopMacro _ _):rest) = flattenTops rest
 
 flattenStmt (StmtMany stmts) = concat $ map flattenStmt stmts
 flattenStmt (StmtExpr (ExprTerm (TermExpr x))) = flattenStmt (StmtExpr x)
@@ -42,8 +44,9 @@ expandTopLevels :: [TopLevel] -> ExpandErr [TopLevel]
 expandTopLevels xs = mapM expandTopLevel xs
 
 expandTopLevel :: TopLevel -> ExpandErr TopLevel
-expandTopLevel (TopStmt stmt) = TopStmt <$> expandStmt stmt
-expandTopLevel (TopMacro mac) = SymTab.mInsertMacro mac >> return (TopMacro mac)
+expandTopLevel (TopStmt stmt pos) = do s <- expandStmt stmt
+                                       return $ TopStmt s pos
+expandTopLevel (TopMacro mac pos) = SymTab.mInsertMacro mac >> return (TopMacro mac pos)
 
 expandStmt :: Stmt -> ExpandErr Stmt
 expandStmt (StmtAssn assn) = StmtAssn <$> expandAssn assn -- this inserts an ident.

@@ -40,8 +40,8 @@ instance Pretty SymbolKey where
   pretty (KeyIdent name) = pretty name
   
 instance Pretty TopLevel where
-  pretty (TopStmt stmt) = pretty stmt <> linebreak
-  pretty (TopMacro mac) = pretty mac <> linebreak
+  pretty (TopStmt stmt _) = pretty stmt <> linebreak
+  pretty (TopMacro mac _) = pretty mac <> linebreak
 
 instance Pretty Stmt where
   pretty (StmtProc p) = pretty p

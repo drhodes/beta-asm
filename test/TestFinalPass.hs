@@ -13,7 +13,7 @@ import           Test.Tasty
 import           Test.Tasty.HUnit
 
 unitTests = testGroup "Unit tests"
-testAll = testGroup "TestLabelPass.hs"
+testAll = testGroup "TestFinalPass.hs"
   [ --------------------------------------------
     testIt "test1"
     (unlines [ "."
@@ -182,28 +182,26 @@ testFileWithBeta fname expect =
 testIt caseNum prog expect =
   testCase caseNum $ testFinalPass prog expect
      
-testFinalPass :: String -> [Value] -> IO ()
 testFinalPass prog expect = 
   do labelPassResult <- doLabelPass prog
      case labelPassResult of
        (Right (vals, _)) ->
          case runFinalPass vals of
            Right result ->
-             unless (expect == result) $
+             unless (expect == (map fst result)) $
                do let trunc x = putStrLn $ take 2000 $ show x
-                  putStrLn "\nFail"
+                  putStrLn "\nFail --------------------------------------------"
                   trunc  prog
-                  putStrLn "\nExpected"
+                  putStrLn "\nExpected -----------"
                   trunc expect
-                  putStrLn "\nGot"
+                  putStrLn "\nGot ----------------"
                   trunc result
-                  putStrLn "\nLabelPass"
+                  putStrLn "\nLabelPass ----------"
                   trunc vals
                   error "test fails"
            Left msg -> error msg
        (Left msg) -> error msg
 
-doLabelPass :: Monad m => String -> m (Either String ([Value], PlaceState))
 doLabelPass prog = do  
   case TP.parse (TP.many topLevel <* TP.eof) "" prog of
     (Right tops) ->
@@ -212,4 +210,5 @@ doLabelPass prog = do
            return $ runLabelPass labelPassStmts (flattenTops topLevels) 
          (Left msg) -> error msg
     (Left msg) -> error (show msg)
+
 

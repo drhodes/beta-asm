@@ -27,7 +27,7 @@ allTests = testGroup "Tests"
 
     --------------------------------------------
     -- simulation tests    
-  , TBM.testAll
+  -- , TBM.testAll
     
   ]
 

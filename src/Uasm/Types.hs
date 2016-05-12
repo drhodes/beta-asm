@@ -5,6 +5,7 @@ module Uasm.Types where
 
 import qualified Data.Map as DM
 import qualified Data.Word as DW
+import           Text.Parsec
 
 data SymbolTable = SymTab { symTabCurScope :: DM.Map SymbolKey Expr
                           , symTabCurMacroScope :: DM.Map SymbolKey Macro
@@ -32,8 +33,8 @@ data Value = ValNum Integer
            | Delayed Binop Value Value
              deriving (Show, Eq, Ord)
 
-data TopLevel = TopStmt Stmt
-              | TopMacro Macro
+data TopLevel = TopStmt Stmt SourcePos
+              | TopMacro Macro SourcePos
                 deriving (Show, Eq, Ord)
 
 data Stmt = StmtProc Proc

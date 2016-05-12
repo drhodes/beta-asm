@@ -15,6 +15,7 @@ import           Uasm.Types
 import qualified Data.Bits as DB
 import Control.Monad.Except
 import qualified Text.PrettyPrint.Leijen as PP
+import           Text.Parsec
 
 {-
 This is the final pass
@@ -41,12 +42,13 @@ runStateExceptT s = flip runStateT s . runExceptT
 runExceptStateT :: s -> StateT s (ExceptT e m) a -> m (Either e (a, s))
 runExceptStateT s = runExceptT . flip runStateT s
 
-runFinalPass vals =
-  do (vs, _) <- runIdentity . runExceptStateT DM.empty $ finalPass vals
-     return $ filter (/=ValNop) vs
-
-
-
+runFinalPass :: [(Value, SourcePos)] -> Either [Char] [(Value, SourcePos)]
+runFinalPass vals = do
+  -- flatten sequences and remove the nops and
+  let flatVals = filter (not . isNop) $ flattenVals vals :: [(Value, SourcePos)]
+  (vs, _) <- runIdentity . runExceptStateT DM.empty $
+    finalPass $ ((map fst flatVals) :: [Value])
+  return $ zip (filter (/=ValNop) vs) (map snd flatVals)
 
 lookupAddr :: Ident -> FinalPass (Maybe Addr)
 lookupAddr name = DM.lookup name <$> get 
@@ -54,18 +56,20 @@ lookupAddr name = DM.lookup name <$> get
 isLabel (ValProc (Label _)) = True
 isLabel _ = False
 
-flattenVals :: [Value] -> [Value]
+flattenVals :: [(Value, SourcePos)] -> [(Value, SourcePos)]
 flattenVals [] = []
-flattenVals (ValSeq xs : rest) = flattenVals $ xs ++ rest
+flattenVals ((ValSeq xs, pos) : rest) = flattenVals $ [(x, pos) | x <- xs] ++ rest
 flattenVals (x:xs) = x : flattenVals xs
 
 identOfLabel (ValProc (Label name)) = name
 
-finalPass vals = 
+isNop (ValNop, _) = True
+isNop (_, _) = False
+
+finalPass :: [Value] -> FinalPass [Value]
+finalPass flatVals = 
   do 
-    -- flatten sequences and remove the nops and
-    let flatVals = filter (/=ValNop) (flattenVals vals)
-        -- associate values with their byte addresses
+    let -- associate values with their byte addresses
         placedBytes = zip flatVals (map Addr [0..])
         -- pickout the labels with their byte addreses
         placedLabels = filter (isLabel . fst) placedBytes

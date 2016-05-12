@@ -16,6 +16,7 @@ import           Data.Word
 import           Data.Functor.Identity
 import qualified Text.JSON.Generic as G
 import Prelude hiding (and, or, xor)
+import qualified Text.Parsec as TP
 
 
 runStateExceptT :: s -> ExceptT e (StateT s m) a -> m (Either e a, s)
@@ -26,7 +27,10 @@ runExceptStateT s = runExceptT . flip runStateT s
 
 new = Mach mkRegFile 0 mkRam
 
-fromWords :: [Word32] -> Mach
+
+fromWordPos ws = fromWords [WordLoc w (Just pos) | (w, pos) <- ws]
+
+fromWords :: [WordLocated] -> Mach
 fromWords words = Mach mkRegFile 0 (DM.fromList $ zip [0, 4 ..] words) 
 
 doMach :: s -> StateT s (ExceptT e Identity) a -> Either e (a, s)
@@ -44,7 +48,7 @@ getReg rx = do
 setMem :: Word32 -> Word32 -> Mac ()
 setMem addr w = do
   Mach rf pc ram <- get
-  put (Mach rf pc (DM.insert addr w ram))
+  put (Mach rf pc (DM.insert addr (WordLoc w Nothing) ram))
         
 setReg :: Reg -> Word32 -> Mac ()
 setReg rx w = do
@@ -63,7 +67,7 @@ setPC pc = do
   Mach rf _ ram <- get
   put (Mach rf pc ram)
 
-getMem :: Word32 -> Mac Word32
+getMem :: Word32 -> Mac WordLocated
 getMem addr = do
   Mach _ _ ram <- get
   case DM.lookup addr ram of
@@ -83,9 +87,9 @@ reset = put new
 ld ra lit rc = do
   -- Reg[Rc] ← Mem[Reg[Ra] + SEXT(literal)]
   regRA <- getReg ra
-  val <- (getMem $ regRA + sxt lit)
+  (WordLoc w _) <- (getMem $ regRA + sxt lit)
     ? "Can't LD: " ++ (show (ra, lit, rc))
-  setReg rc val
+  setReg rc w
 
 opInst oper rc ra rb = do
   incPC
@@ -179,8 +183,9 @@ loadWords words = do
 fetch :: Mac Instruction
 fetch = do
   pc <- getPC 
-  word <- getMem (pc .&. 0x7FFFFFFF)
+  (WordLoc word _) <- getMem (pc .&. 0x7FFFFFFF)
     ? "Mach.fetch can't mem at program counter: " ++ show pc
+    
   decode word
     ? "Mach.fetch can't decode word: " ++ show word
     
@@ -267,7 +272,7 @@ ldr rc lit = do
   let literal = (lit - (fromIntegral pc)) `div` 4 - 1
   incPC
   let ea = pc + (4 * (sxt literal))
-  val <- getMem ea
+  (WordLoc val _) <- getMem ea
   setReg rc val
 
 runOPC :: Instruction -> Mac ()
@@ -322,15 +327,19 @@ go = do
 jsonState :: Mac G.JSValue
 jsonState = liftM G.toJSON get
 
-loadSample1 :: Mac ()
-loadSample1 = loadWords [ 0xAC000000
-                        , 0xAC000000
-                        , 0xAC000000
-                        , 0xAC000000
-                        , 0xAC000000
-                        , 0xAC000000
-                        , 0xAC000000
-                        , 0xAC000000
-                        ]
-  
+-- loadSample1 :: Mac ()
+-- loadSample1 = loadWords [ 0xAC000000
+--                         , 0xAC000000
+--                         , 0xAC000000
+--                         , 0xAC000000
+--                         , 0xAC000000
+--                         , 0xAC000000
+--                         , 0xAC000000
+--                         , 0xAC000000
+--                         ]
 
+currentPos :: Mac (Maybe TP.SourcePos)
+currentPos = do
+  pc <- getPC
+  (WordLoc _ pos) <- getMem pc
+  return pos

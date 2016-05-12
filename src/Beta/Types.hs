@@ -21,6 +21,7 @@ import qualified Text.PrettyPrint.Leijen as PP
 import           Uasm.Pretty
 import qualified Uasm.SymbolTable as SymTab
 import           Uasm.Types
+import qualified Text.Parsec as TP
 
 data Mnemonic = ADD | ADDC | AND | ANDC | BEQ | BNE | CMPEQ 
               | CMPEQC | CMPLE | CMPLEC | CMPLT | CMPLTC | DIV 
@@ -67,7 +68,9 @@ sxt n = let topBitIsOne = DB.shiftR n 15 == 1
            then 0xFFFF0000 DB..|. (fromIntegral n)
            else 0x00000000 DB..|. (fromIntegral n)
 
-type Ram = DM.Map Word32 Word32
+data WordLocated = WordLoc Word32 (Maybe TP.SourcePos)
+                   deriving (Show, Eq, Typeable, Data)
+type Ram = DM.Map Word32 WordLocated
 
 mkRam = DM.empty
   
@@ -78,7 +81,6 @@ data Mach = Mach { cpuRegFile :: RegFile
 
 type Mac b = forall m. ( MonadState Mach m,
                          MonadError String m ) => m b
-
 
 machNew = Mach mkRegFile 0 mkRam
                       
