@@ -1,0 +1,11 @@
+ADDC(SP, 2048, SP)             // allocating
+BEQ(R31, main, R31)            // goto main
+. = . + 0x800
+main:
+ADDC(R31, 256, SP)             // Set stack pointer
+// begin block: "test store"
+ADDC(R31, 16, R1)              //
+ADDC(R31, 42, R2)              //
+ST(R1, 0, R2)                  // storing 42 at memloc 0x10
+HALT()
+// end block: "test store"

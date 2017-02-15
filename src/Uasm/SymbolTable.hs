@@ -1,13 +1,11 @@
 {-# LANGUAGE FlexibleContexts #-}
 module Uasm.SymbolTable where
 
-
 import           Control.Monad.Except
 import           Control.Monad.State
 import           Control.Monad.Trans.Except
 import qualified Data.Map as DM
 import           Prelude hiding (lookup)
-import           Text.PrettyPrint.GenericPretty
 import           Uasm.Types
 
 new = SymTab DM.empty DM.empty NullTable

@@ -1,0 +1,10 @@
+ADDC(R31, 10, R1)              // init running to val 10
+__label_WHILE_0:
+// WHILE: run the body, it will be mutating the conditionRegister
+SUBC(R1, 1, R1)                // decrement
+// WHILE: check the condition register
+BEQ(R1, __label_WHILE_1, R31)  // test to see if loop should break
+BEQ(R31, __label_WHILE_0, R31) // loop
+__label_WHILE_1:
+ADDC(R31, 42, R0)              // put 42 into r0
+HALT() 

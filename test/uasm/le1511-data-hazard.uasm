@@ -1,0 +1,8 @@
+// LE15.1.1: Data Hazards
+
+label:
+    ADDC(r31, 44, r0)
+    SUBC(r0, 0, r1)
+    MULC(r0, 23, r4)
+    LD(R0, 0, r2)
+    XORC(R2, 1, r2)

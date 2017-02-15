@@ -17,8 +17,7 @@ import qualified Data.Map as DM
 import           Data.Word
 import           Data.Generics
 import           Text.JSON.Generic
-import qualified Text.PrettyPrint.Leijen as PP
-import           Uasm.Pretty
+--import           Uasm.Pretty
 import qualified Uasm.SymbolTable as SymTab
 import           Uasm.Types
 import qualified Text.Parsec as TP
@@ -77,6 +76,7 @@ mkRam = DM.empty
 data Mach = Mach { cpuRegFile :: RegFile
                  , cpuPC :: Word32
                  , cpuRam :: Ram
+                 , cpuLog :: [String]
                  } deriving (Show, Eq, Typeable, Data)
 
 type Mac b = forall m. ( MonadState Mach m,

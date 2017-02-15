@@ -1,0 +1,2 @@
+ADDC(R31, 10, R0)              // put 10 in r0
+MUL(R0, R0, R0)                // square r0

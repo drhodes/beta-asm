@@ -24,10 +24,9 @@ import qualified Text.JSON.Generic as G
 import           Data.Word
 import           Beta.Err
 import qualified Text.Parsec.Pos as Pos
+import System.Environment
 
 zeroPos = Pos.newPos "" 0 0 
-
-
 
 padBytes bs = if length bs `mod` 4 == 0
               then bs
@@ -49,15 +48,17 @@ toBinary vals =
 
 assemble :: [Char] -> IO (Either [Char] [(Value, TP.SourcePos)])
 assemble fname =
-  do beta <- readFile "test/uasm/beta.uasm"
+  do beta_uasm_filename <- getEnv "BETA_UASM_FILE"
+     beta <- readFile beta_uasm_filename
      prog <- readFile $ "test/uasm/" ++ fname
      let src = P.eraseComments $ beta ++ "\n" ++ prog
      let result = doFinalPass src
      return result
 
 assembleString s = do
-  beta <- readFile "test/uasm/beta.uasm"
-  let src = P.eraseComments $ beta ++ "\n" ++ s
+  beta_uasm_filename <- getEnv "BETA_UASM_FILE"
+  beta <- readFile beta_uasm_filename
+  let src = P.eraseComments $ beta ++ "\n" ++ s ++ "\nHALT()"
   return $ liftM toBinary $ doFinalPass src
 
 doFinalPass :: String -> Either [Char] [(Value, TP.SourcePos)]
@@ -67,7 +68,7 @@ doFinalPass src =
        (Right (vals, _)) -> runFinalPass vals
        (Left msg) -> error msg
 
--- doLabelPass :: Monad m => String -> m (Either String ([Value], PlaceState))
+--doLabelPass :: Monad m => String -> m (Either String ([Value], PlaceState))
 doLabelPass prog = 
   case TP.parse (TP.many P.topLevel <* TP.eof) "" prog of
     (Right tops) ->

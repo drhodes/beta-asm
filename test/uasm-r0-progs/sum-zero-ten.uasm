@@ -1,0 +1,19 @@
+// sumZeroTen :: AsmEdit ()
+// sumZeroTen = do
+//   cmove 0 retReg "init r0"
+//   let f n = addc retReg n retReg ("adding: " ++ show n ++ ", to r0")
+//   mapM_ f [0 .. 10]
+      
+
+ADDC(R31, 0, R0)               // init r0
+ADDC(R0, 0, R0)                // adding: 0, to r0
+ADDC(R0, 1, R0)                // adding: 1, to r0
+ADDC(R0, 2, R0)                // adding: 2, to r0
+ADDC(R0, 3, R0)                // adding: 3, to r0
+ADDC(R0, 4, R0)                // adding: 4, to r0
+ADDC(R0, 5, R0)                // adding: 5, to r0
+ADDC(R0, 6, R0)                // adding: 6, to r0
+ADDC(R0, 7, R0)                // adding: 7, to r0
+ADDC(R0, 8, R0)                // adding: 8, to r0
+ADDC(R0, 9, R0)                // adding: 9, to r0
+ADDC(R0, 10, R0)               // adding: 10, to r0

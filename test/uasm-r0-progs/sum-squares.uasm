@@ -1,0 +1,49 @@
+// ---------------------------------                                                                                                                                       
+sumSquares:                                                                                                                                                                
+// begin block: "0"                                                                                                                                                        
+// can't toBeta: (AsmAssign: VirtReg "0"                                                                                                                                   
+// can't toBeta: (AsmAssign: VirtReg "1"                                                                                                                                   
+                                                                                                                                                                           
+PUSH(LP)                       // entry pushing linkage pointer                                                                                                            
+PUSH(BP)                       // entry pushing base pointer                                                                                                               
+ADD(SP, R31, BP)               // set base pointer                                                                                                                         
+ADDC(SP, 8, SP)                // entry seq                                                                                                                                
+ADDC(R31, 5, R1)               // init x                                                                                                                                   
+// starting calling sequence for: square                                                                                                                                   
+BEQ(R31, square, LP)           // branching to square                                                                                                                      
+SUBC(SP, 4, SP)                // deallocating square                                                                                                                      
+ADD(R0, R31, R1)               // replace x reg with x*x                                                                                                                   
+ADDC(R31, 4, R2)               // init y                                                                                                                                   
+// starting calling sequence for: square                                                                                                                                   
+BEQ(R31, square, LP)           // branching to square                                                                                                                      
+SUBC(SP, 4, SP)                // deallocating square                                                                                                                      
+ADD(R0, R31, R2)               // replace y reg with y*y                                                                                                                   
+ADD(R2, R1, R0)                // add the squares                                                                                                                          
+POP(R2)                                                                                                                                                                    
+POP(R1)                                                                                                                                                                    
+ADD(BP, R31, SP)               // deallocate space for locals                                                                                                              
+POP(BP)                                                                                                                                                                    
+POP(LP)                                                                                                                                                                    
+JMP(LP, R31)                                                                                                                                                               
+                                                                                                                                                                           
+// end block: "0"                                                                                                                                                          
+                               // end func: sumSquares                                                                                                                     
+// ---------------------------------                                                                                                                                       
+square:                                                                                                                                                                    
+// begin block: "2"                                                                                                                                                        
+// ---------------------------------                                                                                                                                       
+// can't toBeta: (AsmAssign: VirtReg "2"                                                                                                                                   
+                                                                                                                                                                           
+PUSH(LP)                       // entry pushing linkage pointer                                                                                                            
+PUSH(BP)                       // entry pushing base pointer                                                                                                               
+ADD(SP, R31, BP)               // set base pointer                                                                                                                         
+ADDC(SP, 4, SP)                // entry seq                                                                                                                                
+MUL(R1, R1, R0)                // square x                                                                                                                                 
+POP(R1)                                                                                                                                                                    
+ADD(BP, R31, SP)               // deallocate space for locals                                                                                                              
+POP(BP)                                                                                                                                                                    
+POP(LP)                                                                                                                                                                    
+JMP(LP, R31)                                                                                                                                                               
+                                                                                                                                                                           
+// end block: "2"                                                                                                                                                          
+                               // end func: square 

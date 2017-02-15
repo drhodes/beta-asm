@@ -6,6 +6,8 @@ module Uasm.Types where
 import qualified Data.Map as DM
 import qualified Data.Word as DW
 import           Text.Parsec
+import Path
+
 
 data SymbolTable = SymTab { symTabCurScope :: DM.Map SymbolKey Expr
                           , symTabCurMacroScope :: DM.Map SymbolKey Macro
@@ -32,6 +34,10 @@ data Value = ValNum Integer
            | ValSeq [Value]
            | Delayed Binop Value Value
              deriving (Show, Eq, Ord)
+
+data FileSet = FileSet { fsetPaths :: [Path Abs Dir]
+                       , fsetFileNames :: [Path Abs File]
+                       } deriving (Show, Eq)
 
 data TopLevel = TopStmt Stmt SourcePos
               | TopMacro Macro SourcePos

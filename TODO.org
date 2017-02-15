@@ -1,0 +1,9 @@
+
+
+* exp40
+** Include path, how to deal with it, both on the command line and from emacs?
+emacs should be able to add to the path.  How smart should the
+.include code be?
+
+
+* include proc

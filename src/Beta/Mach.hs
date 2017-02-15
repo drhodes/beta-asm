@@ -4,6 +4,7 @@
 
 module Beta.Mach where
 
+import Numeric
 import           Beta.Decoder
 import           Beta.Types
 import           Beta.Err
@@ -17,7 +18,7 @@ import           Data.Functor.Identity
 import qualified Text.JSON.Generic as G
 import Prelude hiding (and, or, xor)
 import qualified Text.Parsec as TP
-
+import qualified Debug.Trace as DT
 
 runStateExceptT :: s -> ExceptT e (StateT s m) a -> m (Either e a, s)
 runStateExceptT s = flip runStateT s . runExceptT
@@ -25,13 +26,13 @@ runStateExceptT s = flip runStateT s . runExceptT
 runExceptStateT :: s -> StateT s (ExceptT e m) a -> m (Either e (a, s))
 runExceptStateT s = runExceptT . flip runStateT s
 
-new = Mach mkRegFile 0 mkRam
+new = Mach mkRegFile 0 mkRam []
 
 
 fromWordPos ws = fromWords [WordLoc w (Just pos) | (w, pos) <- ws]
 
 fromWords :: [WordLocated] -> Mach
-fromWords words = Mach mkRegFile 0 (DM.fromList $ zip [0, 4 ..] words) 
+fromWords words = Mach mkRegFile 0 (DM.fromList $ zip [0, 4 ..] words) []
 
 doMach :: s -> StateT s (ExceptT e Identity) a -> Either e (a, s)
 doMach m f = runIdentity . runExceptStateT m $ f
@@ -45,33 +46,50 @@ getReg rx = do
       Just w -> return w
       Nothing -> throwError $ "Failed to find register in regfile: " ++ (show rx)
 
+runAndGetR0 :: Mac Word32
+runAndGetR0 = do
+  go
+  r <- getReg R0
+  return r
+
+say s = do
+  m <- get
+  let l = cpuLog m
+  put m{cpuLog = l ++ [s]}
+
 setMem :: Word32 -> Word32 -> Mac ()
 setMem addr w = do
-  Mach rf pc ram <- get
-  put (Mach rf pc (DM.insert addr (WordLoc w Nothing) ram))
+  say $ concat ["setting mem@: ", show addr, " to: ", asHex w]
+  Mach rf pc ram log <- get
+  put (Mach rf pc (DM.insert addr (WordLoc w Nothing) ram) log)
         
 setReg :: Reg -> Word32 -> Mac ()
 setReg rx w = do
-  Mach rf pc ram <- get
-  put (Mach (DM.insert rx w rf) pc ram)
+  say $ concat ["setting reg@: ", show rx, " to: ", asHex w]
+  Mach rf pc ram log <- get
+  put (Mach (DM.insert rx w rf) pc ram log)
 
 incPC :: Mac ()
 incPC = do
-  Mach rf pc ram <- get
-  put (Mach rf (pc + 4) ram)
+  Mach rf pc ram log <- get
+  say $ concat ["incrementing pc to: ", asHex $ pc + 4]
+  put (Mach rf (pc + 4) ram log)
 
 getPC :: Mac Word32
 getPC = cpuPC <$> get
   
 setPC pc = do
-  Mach rf _ ram <- get
-  put (Mach rf pc ram)
+  Mach rf _ ram log <- get  
+  say $ concat ["setting pc to: ", asHex $ pc]
+  put (Mach rf pc ram log)
 
 getMem :: Word32 -> Mac WordLocated
 getMem addr = do
-  Mach _ _ ram <- get
+  Mach _ _ ram _ <- get
   case DM.lookup addr ram of
-    Just n -> return n
+    Just n -> do
+      say $ concat ["getting mem@: ", asHex addr, ", it is: ", show n]
+      return n
     Nothing -> throwError $ "Invalid Address: " ++ (show addr)
 
 reset :: Mac ()
@@ -86,6 +104,7 @@ reset = put new
 
 ld ra lit rc = do
   -- Reg[Rc] ← Mem[Reg[Ra] + SEXT(literal)]
+  say $ show ("Load", ra, lit, rc)
   regRA <- getReg ra
   (WordLoc w _) <- (getMem $ regRA + sxt lit)
     ? "Can't LD: " ++ (show (ra, lit, rc))
@@ -99,12 +118,15 @@ opInst oper rc ra rb = do
 
 beq ra lit rc = do
   -- Reg[Rc] ← PC + 4; if Reg[Ra] = 0 then PC ← PC + 4 + 4*SEXT(literal)
+  incPC
   pc <- getPC
   setReg rc pc
   regRA <- getReg ra
-  when (regRA == 0) $ setPC (pc + 4 + 4 * sxt(lit))
+  let ea = pc + 4 * (sxt lit)
+  when (regRA == 0) $ setPC ea
   
 bne ra lit rc = do
+  incPC
   pc <- getPC
   setReg rc (pc + 4)
   regRA <- getReg ra
@@ -112,6 +134,7 @@ bne ra lit rc = do
 
 st rc lit ra = do
   -- Mem[Reg[Ra] + SEXT(literal)] ← Reg[Rc]
+  incPC
   regRa <- getReg ra
   regRc <- getReg rc
   setMem (regRa + sxt lit) regRc
@@ -175,10 +198,10 @@ jmp ra rc = do
   setReg rc pc
   setPC ea
 
+loadWords :: MonadState Mach m => [WordLocated] -> m ()
 loadWords words = do
-  Mach rf pc _ <- get
-  put $ Mach rf pc (DM.fromList $ zip [0, 4 ..] words) 
-
+  Mach rf pc _ log <- get
+  put $ Mach rf pc (DM.fromList $ zip [0, 4 ..] words) log
 
 fetch :: Mac Instruction
 fetch = do
@@ -189,16 +212,16 @@ fetch = do
   decode word
     ? "Mach.fetch can't decode word: " ++ show word
     
-divide c a b = opInst div c a b  
-mul c a b = opInst (*) c a b  
-or c a b = opInst (.|.) c a b  
-shl c a b = opInst (shiftL) c a b
-add c a b  = opInst (+) c a b
-sub c a b = opInst (-) c a b 
-and c a b = opInst (.&.) c a b
-shr c a b = opInst (shiftR) c a b
-xor' c a b = opInst (DB.xor) c a b
-xnor c a b = opInst (\x y -> DB.complement (DB.xor x y)) c a b
+divide c a b = opInst div c a b >> (say $ show ("divide", c, a, b))
+mul c a b = opInst (*) c a b >> (say $ show ("mul", c, a, b))
+or c a b = opInst (.|.) c a b >> (say $ show ("or", c, a, b))
+shl c a b = opInst (shiftL) c a b >> (say $ show ("shl", c, a, b))
+add c a b  = opInst (+) c a b >> (say $ show ("add", c, a, b))
+sub c a b = opInst (-) c a b >> (say $ show ("sub", c, a, b))
+and c a b = opInst (.&.) c a b >> (say $ show ("and", c, a, b))
+shr c a b = opInst (shiftR) c a b >> (say $ show ("shr", c, a, b))
+xor' c a b = opInst (DB.xor) c a b >> (say $ show ("xor'", c, a, b))
+xnor c a b = opInst (\x y -> DB.complement (DB.xor x y)) c a b >> (say $ show ("xnor", c, a, b))
 
 sra rc ra rb = do
   incPC
@@ -238,36 +261,39 @@ runOP inst@(OP (Opcode n) rc ra rb) = do
   f rc ra rb
 
 simpleOPC :: (Word32 -> Word32 -> Word32)
-             -> Reg
-             -> Reg
-             -> Word16
-             -> Mac ()
-             
+          -> Reg
+          -> Reg
+          -> Word16
+          -> Mac ()
 simpleOPC f rc ra lit = do
   incPC
   regRA <- getReg ra
   setReg rc (f regRA (sxt lit))
 
-divc c l a = simpleOPC div c a l
-mulc c l a = simpleOPC (*) c a l  
-orc c l a = simpleOPC (.|.) c a l
+divc c l a = simpleOPC div c a l >> (say $ show ("divc", c, l, a))
+mulc c l a = simpleOPC (*) c a l >> (say $ show ("mulc", c, l, a))
+orc c l a = simpleOPC (.|.) c a l >> (say $ show ("orc", c, l, a))
 shlc rc lit ra = do
+  say $ show ("shlc", rc, lit, ra)
   incPC
   regRA <- getReg ra
   setReg rc (shiftL regRA (fromIntegral (sxt lit)))
 shrc rc lit ra = do
+  say $ show ("shrc", rc, lit, ra)
   incPC
   regRA <- getReg ra
   setReg rc (shiftR regRA (fromIntegral (sxt lit)))
   
-addc c l a  = simpleOPC (+) c a l
-subc c l a = simpleOPC (-) c a l
-andc c l a = simpleOPC (.&.) c a l
-xorc c l a = simpleOPC DB.xor c a l
-xnorc c l a = simpleOPC (\x y -> DB.complement (DB.xor x y)) c a l
+addc c l a  = simpleOPC (+) c a l >> (say $ show ("addc", c, l, a))
+subc c l a = simpleOPC (-) c a l >> (say $ show ("subc", c, l, a))
+andc c l a = simpleOPC (.&.) c a l >> (say $ show ("andc", c, l, a))
+xorc c l a = simpleOPC DB.xor c a l >> (say $ show ("xorc", c, l, a))
+xnorc c l a = simpleOPC (\x y -> DB.complement (DB.xor x y)) c a l >>
+  (say $ show ("xnorc", c, l, a))
 
 ldr :: Reg -> Word16 -> Mac ()
 ldr rc lit = do
+  say $ show ("ldr", rc, lit)
   pc <- getPC
   let literal = (lit - (fromIntegral pc)) `div` 4 - 1
   incPC
@@ -279,7 +305,7 @@ runOPC :: Instruction -> Mac ()
 runOPC inst@(OPC (Opcode n) rc ra lit) = 
   let msg = "runOPC finds an invalid instruction: " ++ (show inst)
   in case n of
-    0x30 -> addc rc lit ra
+    0x30 -> addc rc lit ra 
     0x38 -> andc rc lit ra
     0x1C -> beq ra lit rc
     0x1D -> bne ra lit rc
@@ -300,7 +326,6 @@ runOPC inst@(OPC (Opcode n) rc ra lit) =
     0x3B -> xnorc rc lit ra
     0x3A -> xorc rc lit ra
     _ -> throwError msg
-
     
 step :: Mac ()
 step = do 
@@ -315,28 +340,22 @@ stepN n = do
     else do step ? ("step failed with this many to go: " ++ (show n))
             stepN (n - 1)
 
+asHex w = "0x" ++ showHex w ""
+
 go :: Mac ()
 go = do
   pc1 <- getPC ? "Can't Mach.go"
-  step
-  pc2 <- getPC ? "Can't Mach.go"
-  if pc1 == pc2
-    then return ()
-    else go
+  (WordLoc w _) <- getMem pc1
+  if w == 0 -- if pc contains halt
+    then do log <- cpuLog <$> get
+            if length log == 0
+              then return ()
+              else DT.trace (concat (map (++"\n") log)) (return ())
+    else do step 
+            go
 
 jsonState :: Mac G.JSValue
 jsonState = liftM G.toJSON get
-
--- loadSample1 :: Mac ()
--- loadSample1 = loadWords [ 0xAC000000
---                         , 0xAC000000
---                         , 0xAC000000
---                         , 0xAC000000
---                         , 0xAC000000
---                         , 0xAC000000
---                         , 0xAC000000
---                         , 0xAC000000
---                         ]
 
 currentPos :: Mac (Maybe TP.SourcePos)
 currentPos = do

@@ -254,11 +254,10 @@ stmt = choice [ try stmt1
               , try stmt4
               ]
 
-stmt1 = proc >>= return . StmtProc
-stmt2 = call >>= return . StmtCall
-stmt3 = assn >>= return . StmtAssn
-stmt4 = expr2 >>= return . StmtExpr
-
+stmt1 = StmtProc <$> proc
+stmt2 = StmtCall <$> call
+stmt3 = StmtAssn <$> assn
+stmt4 = StmtExpr <$> expr2
 ------------------------------------------------------------------
 
 assn :: Parser Assn
@@ -337,8 +336,8 @@ topLevel2 = do spaces
                spaces
                return (TopMacro m pos)
 
+sourceFile :: Parser [TopLevel]
 sourceFile = many topLevel <* eof
-
 
   
 eraseLineComment [] _ = []
