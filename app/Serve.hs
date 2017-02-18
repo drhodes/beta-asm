@@ -33,7 +33,6 @@ import qualified Beta.Util as BU
 storeMach var m = liftIO $ M.putMVar var m
 takeMach var = liftIO $ M.takeMVar var 
 
-
 ok x = W.text $ T.pack $ G.encodeJSON ("OK"::String, x)
 err msg = W.text $ T.pack $ JSON.encode ("ERR"::String, msg)
 
